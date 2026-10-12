@@ -5,7 +5,7 @@
 import { and, eq, gte, inArray, lt, lte, or, sql, max, type SQL } from "drizzle-orm";
 import type { DB } from "@/db/client";
 import {
-  dealerships, brands, legalEntities, transactions, jobs, jobParts, labourLogs, capacityProfiles, dailyReports, targets, appointments, alerts as alertsTable, users,
+  dealerships, brands, legalEntities, transactions, jobs, walkIns, leads as leadsTable, testDrives, jobParts, labourLogs, capacityProfiles, dailyReports, targets, appointments, alerts as alertsTable, users,
   type RevenueCategory,
 } from "@/db/schema";
 import {
@@ -17,6 +17,7 @@ import {
   type JobKpis, type JobRecord, type MonthlyTarget,
 } from "@/domain/kpi";
 import { SERVICE_COMMON_STAGES, BODYSHOP_COMMON_STAGES } from "@/domain/workflow";
+import { funnel, type Funnel } from "@/domain/crm";
 import { evaluateAlerts, ALERT_THRESHOLDS, type AlertCandidate, type Severity } from "@/domain/alerts";
 import { can, dealershipScope, ForbiddenError, type Capability } from "@/domain/permissions";
 import type { Actor } from "./principal";
@@ -87,6 +88,7 @@ export interface UnitMetrics {
   bodyshopRevenuePerJob: number | null;
   pipeline: { leads: number | null; bookings: number | null; cancellations: number | null; expectedDeliveries7d: number | null; reportsSubmitted: number; reportsExpected: number };
   freshness: Freshness;
+  showroom: Funnel;
 }
 
 export interface DealerRow extends UnitMetrics {
@@ -156,11 +158,14 @@ interface Raw {
   lastTxn: Map<string, Date>;
   lastJob: Map<string, Date>;
   lastReport: Map<string, string>;
+  crmWalkIns: { dealershipId: string; visitType: "new_car" | "service" | "spare_parts" | "body_shop"; createdAt: Date }[];
+  crmLeads: { id: string; dealershipId: string; createdAt: Date; closedAt: Date | null; status: "open" | "won" | "lost_other_dealer" | "not_interested" | "opted_out" }[];
+  crmDrives: { leadId: string; dealershipId: string; completedAt: Date | null; status: string }[];
 }
 
 async function loadRaw(db: DB, ids: string[], window: DateRange, instants: { from: Date; to: Date }): Promise<Raw> {
   if (!ids.length) {
-    return { txns: [], jobs: [], parts: [], labour: [], capacity: [], reports: [], targets: [] as never, appts: [], lastTxn: new Map(), lastJob: new Map(), lastReport: new Map() };
+    return { txns: [], jobs: [], parts: [], labour: [], capacity: [], reports: [], targets: [] as never, appts: [], lastTxn: new Map(), lastJob: new Map(), lastReport: new Map(), crmWalkIns: [], crmLeads: [], crmDrives: [] };
   }
   const months = eachMonth(window);
   const [txns, jobRows, labour, capacity, reports, tgts, appts, lastTxn, lastJob, lastReport] = await Promise.all([
@@ -180,6 +185,11 @@ async function loadRaw(db: DB, ids: string[], window: DateRange, instants: { fro
     db.select({ d: jobs.dealershipId, at: max(jobs.updatedAt) }).from(jobs).where(and(inArray(jobs.dealershipId, ids), demoFilter(jobs.isDemo))).groupBy(jobs.dealershipId),
     db.select({ d: dailyReports.dealershipId, at: max(dailyReports.businessDate) }).from(dailyReports).where(and(inArray(dailyReports.dealershipId, ids), eq(dailyReports.status, "submitted"), demoFilter(dailyReports.isDemo))).groupBy(dailyReports.dealershipId),
   ]);
+  const [crmWalkIns, crmLeads, crmDrives] = await Promise.all([
+    db.select({ dealershipId: walkIns.dealershipId, visitType: walkIns.visitType, createdAt: walkIns.createdAt }).from(walkIns).where(and(inArray(walkIns.dealershipId, ids), gte(walkIns.createdAt, instants.from), lt(walkIns.createdAt, instants.to), demoFilter(walkIns.isDemo))),
+    db.select({ id: leadsTable.id, dealershipId: leadsTable.dealershipId, createdAt: leadsTable.createdAt, closedAt: leadsTable.closedAt, status: leadsTable.status }).from(leadsTable).where(and(inArray(leadsTable.dealershipId, ids), lt(leadsTable.createdAt, instants.to), or(eq(leadsTable.status, "open"), gte(leadsTable.closedAt, instants.from), gte(leadsTable.createdAt, instants.from)), demoFilter(leadsTable.isDemo))),
+    db.select({ leadId: testDrives.leadId, dealershipId: leadsTable.dealershipId, completedAt: testDrives.completedAt, status: testDrives.status }).from(testDrives).innerJoin(leadsTable, eq(leadsTable.id, testDrives.leadId)).where(and(inArray(leadsTable.dealershipId, ids), eq(testDrives.status, "completed"), demoFilter(leadsTable.isDemo))),
+  ]);
   const jobIds = jobRows.map((j) => j.id);
   const parts = jobIds.length ? await db.select({ jobId: jobParts.jobId, status: jobParts.status, issuedAt: jobParts.issuedAt }).from(jobParts).where(inArray(jobParts.jobId, jobIds)) : [];
   return {
@@ -194,6 +204,9 @@ async function loadRaw(db: DB, ids: string[], window: DateRange, instants: { fro
     lastTxn: new Map(lastTxn.map((r) => [r.d, r.at!])),
     lastJob: new Map(lastJob.map((r) => [r.d, r.at!])),
     lastReport: new Map(lastReport.map((r) => [r.d, r.at!])),
+    crmWalkIns,
+    crmLeads,
+    crmDrives,
   };
 }
 
@@ -342,6 +355,14 @@ function computeUnit(raw: Raw, dealerIds: string[], dealersInfo: DealerInfo[], p
     bodyshopRevenuePerJob: averagePerJob(bl.revenue, bl.jobs),
     pipeline: { leads: sumOrNull("leads"), bookings: sumOrNull("bookings"), cancellations: sumOrNull("bookingCancellations"), expectedDeliveries7d: expDel, reportsSubmitted, reportsExpected },
     freshness,
+    showroom: funnel(
+      {
+        walkIns: raw.crmWalkIns.filter((w) => set.has(w.dealershipId)),
+        leads: raw.crmLeads.filter((l) => set.has(l.dealershipId)).map((l) => ({ ...l, hadTestDrive: raw.crmDrives.some((d) => d.leadId === l.id) })),
+        testDrivesCompleted: raw.crmDrives.filter((d) => set.has(d.dealershipId) && d.completedAt).map((d) => ({ completedAt: d.completedAt! })),
+      },
+      inst,
+    ),
   };
 }
 

@@ -11,6 +11,8 @@ import type { Channel, NotificationEvent } from "@/db/schema";
 import { formatDateTime, formatInr } from "./format";
 
 export const EVENT_LABELS: Record<NotificationEvent, string> = {
+  enquiry_received: "Enquiry received",
+  model_update: "Model update (nurture)",
   appointment_confirmed: "Appointment confirmed",
   vehicle_received: "Vehicle received / inspected",
   approval_required: "Approval required",
@@ -60,6 +62,10 @@ export interface TemplateContext {
   expectedAt?: Date | null;
   delayReason?: string | null;
   outstandingAmount?: number | null;
+  models?: string | null;
+  updateTitle?: string | null;
+  updateMessage?: string | null;
+  validUntil?: string | null;
 }
 
 /** Plain-text bodies. Provider adapters may map these to approved templates (e.g. WhatsApp). */
@@ -67,6 +73,10 @@ export function renderTemplate(event: NotificationEvent, c: TemplateContext): st
   const hi = `Hello ${c.customerName},`;
   const sign = `— ${c.dealershipName}`;
   switch (event) {
+    case "enquiry_received":
+      return `${hi} thank you for visiting ${c.dealershipName}${c.models ? ` and your interest in the ${c.models}` : ""}. Your consultant will share prices, offers and test-drive options shortly. Reply STOP to opt out of updates. ${sign}`;
+    case "model_update":
+      return `${hi} ${c.updateTitle ?? "an update"}${c.models ? ` on the ${c.models}` : ""}: ${c.updateMessage ?? ""}${c.validUntil ? ` Valid until ${c.validUntil}.` : ""} Reply STOP to opt out of updates. ${sign}`;
     case "appointment_confirmed":
       return `${hi} your appointment at ${c.dealershipName} is confirmed for ${formatDateTime(c.scheduledAt ?? null)}${c.registrationNo ? ` (vehicle ${c.registrationNo})` : ""}.${c.requestedWork ? ` Requested work: ${c.requestedWork}.` : ""} ${sign}`;
     case "vehicle_received":
@@ -80,8 +90,8 @@ export function renderTemplate(event: NotificationEvent, c: TemplateContext): st
   }
 }
 
-export function dedupeKey(event: NotificationEvent, ref: { jobId?: string | null; appointmentId?: string | null; variant?: string }): string {
-  return [event, ref.jobId ?? ref.appointmentId ?? "none", ref.variant ?? ""].join(":");
+export function dedupeKey(event: NotificationEvent, ref: { jobId?: string | null; appointmentId?: string | null; leadId?: string | null; variant?: string }): string {
+  return [event, ref.jobId ?? ref.appointmentId ?? ref.leadId ?? "none", ref.variant ?? ""].join(":");
 }
 
 /** Delay notification only when the customer-facing date moves LATER than what they were last told. */

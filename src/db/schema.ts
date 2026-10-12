@@ -71,6 +71,8 @@ export const ROLES = [
   "service_advisor",
   "technician", // Technician / body shop staff
   "admin",
+  "sales_consultant", // Showroom sales consultant
+  "kiosk", // Showroom / lounge touch-screen device account (submit-only)
 ] as const;
 export type Role = (typeof ROLES)[number];
 
@@ -123,6 +125,9 @@ export const customers = pgTable(
     consentSms: boolean("consent_sms").notNull().default(false),
     consentEmail: boolean("consent_email").notNull().default(false),
     consentRecordedAt: timestamp("consent_recorded_at", { withTimezone: true }),
+    // Marketing (nurture) consent is separate from service-update consent.
+    consentMarketing: boolean("consent_marketing").notNull().default(false),
+    marketingOptOutAt: timestamp("marketing_opt_out_at", { withTimezone: true }),
     isDemo: boolean("is_demo").notNull().default(false),
     createdAt: createdAt(),
   },
@@ -466,6 +471,8 @@ export const alerts = pgTable(
 /* ───────────────────────────── Notifications ───────────────────────────── */
 
 export const NOTIFICATION_EVENTS = [
+  "enquiry_received",
+  "model_update",
   "appointment_confirmed",
   "vehicle_received",
   "approval_required",
@@ -484,6 +491,7 @@ export const notifications = pgTable(
     customerId: uuid("customer_id").notNull().references(() => customers.id),
     jobId: uuid("job_id").references(() => jobs.id),
     appointmentId: uuid("appointment_id").references(() => appointments.id),
+    leadId: uuid("lead_id").references(() => leads.id),
     channel: text("channel").$type<Channel>(),
     recipient: text("recipient"),
     body: text("body").notNull(),
@@ -524,3 +532,210 @@ export const appSettings = pgTable("app_settings", {
   key: text("key").primaryKey(),
   value: jsonb("value").notNull(),
 });
+
+/* ═════════════════════════════ Showroom & sales (CRM) ═════════════════════════════ */
+
+/** Vehicle catalogue per brand — drives enquiry capture on kiosks and nurture targeting. */
+export const carModels = pgTable(
+  "car_models",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brandId: uuid("brand_id").notNull().references(() => brands.id),
+    name: text("name").notNull(),
+    bodyType: text("body_type"), // hatchback, sedan, suv, mpv, luxury, ev …
+    fuelTypes: text("fuel_types"), // comma-separated: petrol,diesel,hybrid,ev,cng
+    priceBand: text("price_band"), // display text, e.g. "₹11–20 L" (indicative, set by Kun)
+    active: boolean("active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isDemo: boolean("is_demo").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("car_models_brand_name_uq").on(t.brandId, t.name)],
+);
+
+export const VISIT_TYPES = ["new_car", "service", "spare_parts", "body_shop"] as const;
+export type VisitType = (typeof VISIT_TYPES)[number];
+
+/** A front-desk visit captured on a kiosk or by staff. */
+export const walkIns = pgTable(
+  "walk_ins",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealershipId: uuid("dealership_id").notNull().references(() => dealerships.id),
+    customerId: uuid("customer_id").notNull().references(() => customers.id),
+    visitType: text("visit_type").$type<VisitType>().notNull(),
+    token: text("token").notNull(), // e.g. N-007, shown to the customer
+    businessDate: date("business_date", { mode: "string" }).notNull(),
+    capturedVia: text("captured_via").$type<"kiosk" | "staff">().notNull(),
+    kioskUserId: uuid("kiosk_user_id").references(() => users.id),
+    registrationNo: text("registration_no"),
+    vehicleModel: text("vehicle_model"),
+    request: text("request"), // service need / part needed / damage description
+    insuranceClaim: boolean("insurance_claim"),
+    status: text("status").$type<"waiting" | "attending" | "done" | "left">().notNull().default("waiting"),
+    attendedById: uuid("attended_by_id").references(() => users.id),
+    attendedAt: timestamp("attended_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    outcomeNote: text("outcome_note"),
+    leadId: uuid("lead_id"),
+    jobId: uuid("job_id"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index("walk_ins_dealer_date_idx").on(t.dealershipId, t.businessDate)],
+);
+
+export const LEAD_STAGES = ["enquiry", "test_drive", "negotiation", "booked"] as const;
+export type LeadStage = (typeof LEAD_STAGES)[number];
+export const LEAD_STATUSES = ["open", "won", "lost_other_dealer", "not_interested", "opted_out"] as const;
+export type LeadStatus = (typeof LEAD_STATUSES)[number];
+export const LEAD_SOURCES = ["walk_in", "phone", "web", "lounge_feedback", "referral", "other"] as const;
+export const TIMEFRAMES = ["immediate", "within_1m", "1_3m", "3_6m", "6_12m", "12m_plus", "not_planning"] as const;
+export type Timeframe = (typeof TIMEFRAMES)[number];
+
+/** New-car enquiry. Nurtured while status = open; any closing outcome stops nurture. */
+export const leads = pgTable(
+  "leads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadNo: text("lead_no").notNull().unique(),
+    dealershipId: uuid("dealership_id").notNull().references(() => dealerships.id),
+    customerId: uuid("customer_id").notNull().references(() => customers.id),
+    source: text("source").$type<(typeof LEAD_SOURCES)[number]>().notNull(),
+    walkInId: uuid("walk_in_id"),
+    consultantId: uuid("consultant_id").references(() => users.id),
+    stage: text("stage").$type<LeadStage>().notNull().default("enquiry"),
+    status: text("status").$type<LeadStatus>().notNull().default("open"),
+    timeframe: text("timeframe").$type<Timeframe>(),
+    budgetMin: money("budget_min"),
+    budgetMax: money("budget_max"),
+    fuelPreference: text("fuel_preference"),
+    financeNeeded: boolean("finance_needed"),
+    exchangeVehicle: text("exchange_vehicle"), // free text: make/model/year
+    nextFollowUpAt: timestamp("next_follow_up_at", { withTimezone: true }),
+    lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    lostToBrand: text("lost_to_brand"),
+    lostToModel: text("lost_to_model"),
+    lostToDealer: text("lost_to_dealer"),
+    closeReason: text("close_reason"),
+    wonInvoiceRef: text("won_invoice_ref"),
+    version: integer("version").notNull().default(1),
+    createdById: uuid("created_by_id").references(() => users.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("leads_dealer_status_idx").on(t.dealershipId, t.status), index("leads_customer_idx").on(t.customerId)],
+);
+
+export const leadInterests = pgTable(
+  "lead_interests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    modelId: uuid("model_id").notNull().references(() => carModels.id),
+    variant: text("variant"),
+    colour: text("colour"),
+    isPrimary: boolean("is_primary").notNull().default(false),
+  },
+  (t) => [uniqueIndex("lead_interests_uq").on(t.leadId, t.modelId)],
+);
+
+export const testDrives = pgTable("test_drives", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  modelId: uuid("model_id").notNull().references(() => carModels.id),
+  status: text("status").$type<"requested" | "scheduled" | "completed" | "cancelled">().notNull().default("requested"),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  licenceChecked: boolean("licence_checked").notNull().default(false),
+  rating: integer("rating"), // customer impression 1–5
+  notes: text("notes"),
+  consultantId: uuid("consultant_id").references(() => users.id),
+  createdAt: createdAt(),
+});
+
+export const leadActivities = pgTable(
+  "lead_activities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    type: text("type").$type<"created" | "note" | "call" | "visit" | "message" | "test_drive" | "stage_change" | "nurture" | "follow_up" | "outcome" | "assignment">().notNull(),
+    text: text("text"),
+    userId: uuid("user_id").references(() => users.id),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("lead_activities_lead_idx").on(t.leadId, t.at)],
+);
+
+export const followUps = pgTable(
+  "follow_ups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    leadId: uuid("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    assignedToId: uuid("assigned_to_id").references(() => users.id),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
+    kind: text("kind").$type<"call" | "message" | "visit">().notNull().default("call"),
+    reason: text("reason").notNull(),
+    modelUpdateId: uuid("model_update_id"),
+    status: text("status").$type<"open" | "done" | "skipped">().notNull().default("open"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    completedById: uuid("completed_by_id").references(() => users.id),
+    outcomeNote: text("outcome_note"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("follow_ups_assignee_idx").on(t.assignedToId, t.status, t.dueAt)],
+);
+
+export const MODEL_UPDATE_TYPES = ["offer", "price_change", "new_variant", "stock_arrival", "launch", "event"] as const;
+
+/** A nurture broadcast about a model, sent to eligible open enquiries (and optionally prospects). */
+export const modelUpdates = pgTable("model_updates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  modelId: uuid("model_id").notNull().references(() => carModels.id),
+  dealershipId: uuid("dealership_id").references(() => dealerships.id), // NULL = all dealerships of the brand in scope
+  type: text("type").$type<(typeof MODEL_UPDATE_TYPES)[number]>().notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  validUntil: date("valid_until", { mode: "string" }),
+  includeProspects: boolean("include_prospects").notNull().default(false),
+  status: text("status").$type<"draft" | "published">().notNull().default("draft"),
+  recipients: integer("recipients").notNull().default(0),
+  tasksCreated: integer("tasks_created").notNull().default(0),
+  createdById: uuid("created_by_id").references(() => users.id),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  isDemo: boolean("is_demo").notNull().default(false),
+  createdAt: createdAt(),
+});
+
+export const BUDGET_BANDS = ["under_10l", "10_15l", "15_25l", "25_50l", "50l_1cr", "above_1cr"] as const;
+
+/** Lounge survey: upgrade intent of existing customers → future-prospect pool. */
+export const loungeFeedback = pgTable(
+  "lounge_feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dealershipId: uuid("dealership_id").notNull().references(() => dealerships.id),
+    customerId: uuid("customer_id").notNull().references(() => customers.id),
+    kioskUserId: uuid("kiosk_user_id").references(() => users.id),
+    currentMake: text("current_make"),
+    currentModel: text("current_model"),
+    registrationNo: text("registration_no"),
+    purchaseYear: integer("purchase_year"),
+    serviceRating: integer("service_rating"), // 1–5, today's experience
+    interest: text("interest").$type<"yes" | "maybe" | "no">().notNull(),
+    timeframe: text("timeframe").$type<Timeframe>(),
+    budgetBand: text("budget_band").$type<(typeof BUDGET_BANDS)[number]>(),
+    preferredBodyType: text("preferred_body_type"),
+    preferredFuel: text("preferred_fuel"),
+    preferredModelIds: jsonb("preferred_model_ids").$type<string[]>().notNull().default([]),
+    otherPreferences: text("other_preferences"),
+    comments: text("comments"),
+    status: text("status").$type<"new" | "contacted" | "converted" | "not_now">().notNull().default("new"),
+    convertedLeadId: uuid("converted_lead_id"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index("lounge_feedback_dealer_idx").on(t.dealershipId, t.createdAt)],
+);

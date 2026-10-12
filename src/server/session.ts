@@ -8,6 +8,8 @@ import { DATA_MODE } from "./data-mode";
 
 export const SESSION_COOKIE = "kun_session";
 export const SESSION_TTL_HOURS = Number(process.env.SESSION_TTL_HOURS ?? 12);
+/** Kiosk devices stay signed in so the showroom screen doesn’t log out mid-day. */
+export const KIOSK_SESSION_DAYS = Number(process.env.KIOSK_SESSION_DAYS ?? 30);
 
 const sha = (t: string) => createHash("sha256").update(t).digest("hex");
 
@@ -18,7 +20,7 @@ export async function login(db: DB, email: string, password: string): Promise<{ 
   if (!u || !u.active || !ok) return null;
   if (DATA_MODE === "live" && u.isDemo) return null;
   const token = randomBytes(32).toString("base64url");
-  const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 3_600_000);
+  const expiresAt = new Date(Date.now() + (u.role === "kiosk" ? KIOSK_SESSION_DAYS * 24 : SESSION_TTL_HOURS) * 3_600_000);
   await db.insert(sessions).values({ id: sha(token), userId: u.id, expiresAt });
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, u.id));
   await db.delete(sessions).where(lt(sessions.expiresAt, new Date())); // housekeeping

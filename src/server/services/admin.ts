@@ -39,6 +39,7 @@ export async function saveUser(db: DB, actor: Actor, raw: z.input<typeof userInp
   if (!parsed.success) throw new ValidationError(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`));
   const input = parsed.data;
   if (!GROUP_WIDE_ROLES.includes(input.role) && !input.dealershipIds.length) throw new ValidationError(["Location-bound roles need at least one dealership"]);
+  if (input.role === "kiosk" && input.dealershipIds.length !== 1) throw new ValidationError(["A kiosk device must be linked to exactly one dealership"]);
   if (raw.id === actor.id && (input.role !== actor.role || !input.active)) throw new ValidationError(["You cannot change your own role or deactivate yourself"]);
   const scopeIds = GROUP_WIDE_ROLES.includes(input.role) ? [] : input.dealershipIds;
 

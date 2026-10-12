@@ -10,6 +10,7 @@ export interface NotifyRequest {
   customerId: string;
   jobId?: string | null;
   appointmentId?: string | null;
+  leadId?: string | null;
   variant?: string; // e.g. new expected date for repair_delayed
   context: Omit<TemplateContext, "customerName" | "dealershipName">;
   isDemo?: boolean;
@@ -20,7 +21,7 @@ export interface NotifyRequest {
  * Idempotent: a second request with the same dedupe key returns the existing record.
  */
 export async function notify(db: DB, req: NotifyRequest): Promise<typeof notifications.$inferSelect> {
-  const key = dedupeKey(req.event, { jobId: req.jobId, appointmentId: req.appointmentId, variant: req.variant });
+  const key = dedupeKey(req.event, { jobId: req.jobId, appointmentId: req.appointmentId, leadId: req.leadId, variant: req.variant });
   const [existing] = await db.select().from(notifications).where(eq(notifications.dedupeKey, key)).limit(1);
   if (existing) return existing;
 
@@ -44,6 +45,7 @@ export async function notify(db: DB, req: NotifyRequest): Promise<typeof notific
       customerId: req.customerId,
       jobId: req.jobId ?? null,
       appointmentId: req.appointmentId ?? null,
+      leadId: req.leadId ?? null,
       channel: choice.channel,
       recipient: choice.channel ? choice.recipient : null,
       body,

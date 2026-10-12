@@ -16,6 +16,8 @@ export const ROLE_LABELS: Record<Role, string> = {
   service_advisor: "Service advisor",
   technician: "Technician / body shop staff",
   admin: "Administrator",
+  sales_consultant: "Sales consultant",
+  kiosk: "Kiosk device (showroom / lounge)",
 };
 
 export const CAPABILITIES = [
@@ -42,13 +44,21 @@ export const CAPABILITIES = [
   "admin.master_data",
   "admin.workflow",
   "audit.view",
+  "frontdesk.view", // walk-in queue
+  "leads.view",
+  "leads.manage", // update enquiries, test drives, follow-ups, outcomes
+  "leads.assign", // (re)assign consultants, reopen
+  "model_updates.manage", // publish nurture updates
+  "prospects.view", // lounge feedback / future prospects
+  "catalogue.manage", // car models & kiosk devices
+  "kiosk.submit", // device account: submit kiosk forms only
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
 const MATRIX: Record<Role, Capability[]> = {
   md: [
     "group.dashboard", "dealership.dashboard", "financials.view", "jobs.view", "daily_report.group",
-    "alerts.view", "alerts.manage", "notifications.view", "audit.view",
+    "alerts.view", "alerts.manage", "notifications.view", "audit.view", "leads.view", "prospects.view",
   ],
   group_finance: [
     "group.dashboard", "dealership.dashboard", "financials.view", "jobs.view", "daily_report.group",
@@ -59,13 +69,16 @@ const MATRIX: Record<Role, Capability[]> = {
     "dealership.dashboard", "financials.view", "jobs.view", "jobs.create", "jobs.manage", "customers.contact",
     "appointments.manage", "daily_report.submit", "transactions.manage", "alerts.view", "alerts.manage",
     "notifications.view", "notifications.retry",
+    "frontdesk.view", "leads.view", "leads.manage", "leads.assign", "model_updates.manage", "prospects.view", "catalogue.manage",
   ],
   service_advisor: [
     "jobs.view", "jobs.create", "jobs.manage", "customers.contact", "appointments.manage",
-    "notifications.view", "notifications.retry", "daily_report.submit",
+    "notifications.view", "notifications.retry", "daily_report.submit", "frontdesk.view",
   ],
   technician: ["jobs.view", "jobs.work"],
-  admin: ["admin.users", "admin.master_data", "admin.workflow", "audit.view", "notifications.view"],
+  admin: ["admin.users", "admin.master_data", "admin.workflow", "audit.view", "notifications.view", "catalogue.manage"],
+  sales_consultant: ["frontdesk.view", "leads.view", "leads.manage", "prospects.view", "customers.contact", "notifications.view", "daily_report.submit"],
+  kiosk: ["kiosk.submit"],
 };
 
 export interface Principal {
@@ -141,6 +154,10 @@ export function homePathFor(p: Principal): string {
       return "/jobs?mine=1";
     case "admin":
       return "/admin";
+    case "sales_consultant":
+      return "/leads";
+    case "kiosk":
+      return "/kiosk";
   }
 }
 
