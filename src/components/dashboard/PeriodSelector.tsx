@@ -58,7 +58,8 @@ export function PeriodSelector({ current, start, end, today }: { current: string
           <button className="btn-primary btn-sm">Apply</button>
         </form>
       )}
-      {pending && <span className="text-xs text-ink-3" role="status">Updating…</span>}
+      {pending && <span className="text-xs text-ink-2" role="status">Updating figures…</span>}
+      {pending && <style>{`main#main > *:not(header) { opacity: .55; transition: opacity .15s; pointer-events: none; }`}</style>}
     </div>
   );
 }

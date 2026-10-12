@@ -45,6 +45,9 @@ export function getDb(): Promise<DB> {
   if (holder.override) return Promise.resolve(holder.override);
   if (!holder.db) {
     const url = process.env.DATABASE_URL;
+    if (!url && process.env.NODE_ENV === "production" && process.env.ALLOW_PGLITE !== "1" && process.env.NEXT_PHASE !== "phase-production-build") {
+      throw new Error("DATABASE_URL is not set. Production requires PostgreSQL (set ALLOW_PGLITE=1 only for a single-machine demo).");
+    }
     holder.db = url
       ? createPg(url)
       : createPglite(process.env.PGLITE_DIR ?? path.join(process.cwd(), ".data", "pglite"));

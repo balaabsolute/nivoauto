@@ -1,10 +1,15 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { importAction, type ImportState } from "../actions";
 
 export function ImportForm() {
   const [state, action, pending] = useActionState<ImportState, FormData>(importAction, undefined);
   const data = state?.ok ? state.data : undefined;
+  const router = useRouter();
+  useEffect(() => {
+    if (data && !data.dryRun) router.refresh();
+  }, [data, router]);
   return (
     <div className="space-y-4">
       <form action={action} className="flex flex-wrap items-end gap-2">

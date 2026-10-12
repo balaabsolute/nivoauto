@@ -1,6 +1,4 @@
 "use server";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { actorForAction } from "@/server/auth";
 import { run, type ActionResult } from "@/server/action-result";
@@ -25,11 +23,6 @@ function localDateTime(v: string | null): Date | null {
   const [h, m] = t.split(":").map(Number);
   return new Date(zonedMidnight(d).getTime() + (h * 60 + m) * 60_000);
 }
-const bump = (id: string) => {
-  revalidatePath(`/jobs/${id}`);
-  revalidatePath("/jobs");
-  revalidatePath("/bodyshop");
-};
 
 type R = ActionResult<unknown> | undefined;
 
@@ -60,10 +53,7 @@ export async function createJobAction(_p: R, f: FormData): Promise<ActionResult<
     });
     id = job.id;
   });
-  if (res.ok && id) {
-    revalidatePath("/jobs");
-    redirect(`/jobs/${id}?created=1`);
-  }
+  if (res.ok && id) return { ok: true as const, data: { redirectTo: `/jobs/${id}?created=1` } };
   return res;
 }
 
@@ -72,7 +62,6 @@ export async function transitionAction(_p: R, f: FormData) {
   const res = await run(async () => {
     await transitionJob(await getDb(), await actorForAction(), id, str(f, "toStage") ?? "", { reason: str(f, "reason") ?? undefined, expectedVersion: num(f, "version") ?? undefined });
   }, "Stage updated");
-  bump(id);
   return res;
 }
 
@@ -90,7 +79,6 @@ export async function updateJobAction(_p: R, f: FormData) {
     }
     await updateJob(await getDb(), await actorForAction(), id, patch, num(f, "version") ?? undefined);
   }, "Saved");
-  bump(id);
   return res;
 }
 
@@ -100,49 +88,42 @@ export async function approvalAction(_p: R, f: FormData) {
   const res = await run(async () => {
     await recordApproval(await getDb(), await actorForAction("jobs.manage"), id, decision, num(f, "approvedAmount"), str(f, "note") ?? undefined);
   }, decision === "approved" ? "Approval recorded" : "Decline recorded");
-  bump(id);
   return res;
 }
 
 export async function cancelAction(_p: R, f: FormData) {
   const id = str(f, "jobId")!;
   const res = await run(async () => cancelJob(await getDb(), await actorForAction("jobs.manage"), id, str(f, "reason") ?? ""), "Job cancelled");
-  bump(id);
   return res;
 }
 
 export async function noteAction(_p: R, f: FormData) {
   const id = str(f, "jobId")!;
   const res = await run(async () => addNote(await getDb(), await actorForAction(), id, str(f, "text") ?? ""), "Note added");
-  bump(id);
   return res;
 }
 
 export async function checklistAction(_p: R, f: FormData) {
   const id = str(f, "jobId")!;
   const res = await run(async () => setChecklistItem(await getDb(), await actorForAction(), str(f, "itemId")!, str(f, "result") as "ok", str(f, "note")));
-  bump(id);
   return res;
 }
 
 export async function addPartAction(_p: R, f: FormData) {
   const id = str(f, "jobId")!;
   const res = await run(async () => addPart(await getDb(), await actorForAction(), id, { description: str(f, "description") ?? "", partNo: str(f, "partNo"), quantity: num(f, "quantity") ?? 1 }), "Part requested");
-  bump(id);
   return res;
 }
 
 export async function partStatusAction(_p: R, f: FormData) {
   const id = str(f, "jobId")!;
   const res = await run(async () => setPartStatus(await getDb(), await actorForAction(), str(f, "partId")!, str(f, "status") as "issued"));
-  bump(id);
   return res;
 }
 
 export async function labourAction(_p: R, f: FormData) {
   const id = str(f, "jobId")!;
   const res = await run(async () => logLabour(await getDb(), await actorForAction(), id, { hours: num(f, "hours") ?? 0, workDate: str(f, "workDate") ?? undefined }), "Hours logged");
-  bump(id);
   return res;
 }
 
@@ -153,6 +134,13 @@ export async function photoAction(_p: R, f: FormData) {
     if (!(file instanceof File) || file.size === 0) throw new (await import("@/server/errors")).ValidationError(["Choose a photo"]);
     await addPhoto(await getDb(), await actorForAction(), id, { name: file.name, type: file.type, bytes: new Uint8Array(await file.arrayBuffer()) }, str(f, "caption") ?? undefined);
   }, "Photo added");
-  bump(id);
   return res;
+}
+
+export async function retryJobNotificationAction(_p: R, f: FormData) {
+  const { retryNotification } = await import("@/server/services/admin");
+  return run(async () => {
+    const n = await retryNotification(await getDb(), await actorForAction("notifications.retry"), String(f.get("id")));
+    return n.status;
+  }, "Retried");
 }

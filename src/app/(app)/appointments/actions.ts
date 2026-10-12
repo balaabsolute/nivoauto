@@ -1,6 +1,4 @@
 "use server";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { actorForAction } from "@/server/auth";
 import { run, type ActionResult } from "@/server/action-result";
@@ -32,22 +30,20 @@ export async function createAppointmentAction(_p: R, f: FormData) {
       preferredChannel: (s(f, "preferredChannel") as "whatsapp") ?? null,
     });
   }, "Appointment booked; confirmation recorded");
-  revalidatePath("/appointments");
   return res;
 }
 
-export async function checkInAction(_p: R, f: FormData) {
+export async function checkInAction(_p: R, f: FormData): Promise<ActionResult<unknown>> {
   let jobId: string | undefined;
   const res = await run(async () => {
     const job = await checkInAppointment(await getDb(), await actorForAction("appointments.manage"), s(f, "id")!);
     jobId = job.id;
   });
-  if (res.ok && jobId) redirect(`/jobs/${jobId}?created=1`);
+  if (res.ok && jobId) return { ok: true as const, data: { redirectTo: `/jobs/${jobId}?created=1` } };
   return res;
 }
 
 export async function appointmentStatusAction(_p: R, f: FormData) {
   const res = await run(async () => setAppointmentStatus(await getDb(), await actorForAction("appointments.manage"), s(f, "id")!, s(f, "status") as "no_show"));
-  revalidatePath("/appointments");
   return res;
 }

@@ -1,5 +1,4 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
 import { actorForAction } from "@/server/auth";
 import { run, type ActionResult } from "@/server/action-result";
@@ -21,6 +20,5 @@ export async function saveDailyReportAction(_p: ActionResult<unknown> | undefine
       submit,
     });
   }, submit ? "Daily report submitted" : "Draft saved");
-  revalidatePath("/reports/daily");
   return res;
 }

@@ -1,5 +1,4 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
 import { actorForAction } from "@/server/auth";
 import { run, type ActionResult } from "@/server/action-result";
@@ -21,18 +20,15 @@ export async function saveUserAction(_p: R, f: FormData) {
       password: v(f, "password") ?? "",
     });
   }, "User saved. Changes to role or access sign the user out of existing sessions.");
-  revalidatePath("/admin");
   return res;
 }
 
 export async function saveEntityAction(_p: R, f: FormData) {
   const res = await run(async () => saveLegalEntity(await getDb(), await actorForAction("admin.master_data"), { code: v(f, "code") ?? "", name: v(f, "name") ?? "", registrationRef: v(f, "registrationRef") }), "Legal entity added");
-  revalidatePath("/admin/dealerships");
   return res;
 }
 export async function saveBrandAction(_p: R, f: FormData) {
   const res = await run(async () => saveBrand(await getDb(), await actorForAction("admin.master_data"), { name: v(f, "name") ?? "" }), "Brand added");
-  revalidatePath("/admin/dealerships");
   return res;
 }
 export async function saveDealershipAction(_p: R, f: FormData) {
@@ -40,7 +36,6 @@ export async function saveDealershipAction(_p: R, f: FormData) {
     id: v(f, "id") ?? undefined, code: v(f, "code") ?? "", name: v(f, "name") ?? "", brandId: v(f, "brandId") ?? "", legalEntityId: v(f, "legalEntityId") ?? "",
     locationName: v(f, "locationName") ?? "", city: v(f, "city"), hasSales: f.get("hasSales") === "on", hasService: f.get("hasService") === "on", hasBodyShop: f.get("hasBodyShop") === "on", active: f.get("active") === "on",
   }), "Dealership saved");
-  revalidatePath("/admin/dealerships");
   return res;
 }
 export async function saveCapacityAction(_p: R, f: FormData) {
@@ -49,7 +44,6 @@ export async function saveCapacityAction(_p: R, f: FormData) {
     dealershipId: v(f, "dealershipId")!, resourceType: v(f, "resourceType") as ResourceType, physicalUnits: Number(v(f, "physicalUnits") ?? 0),
     productiveHoursPerUnitPerDay: Number(v(f, "hours") ?? 0), workingDays: days,
   }), "Capacity saved");
-  revalidatePath("/admin/capacity");
   return res;
 }
 export async function saveStagesAction(_p: R, f: FormData) {
@@ -64,6 +58,5 @@ export async function saveStagesAction(_p: R, f: FormData) {
     if (f.get("intent") === "reset" && dealershipId) await resetStageConfig(await getDb(), await actorForAction("admin.workflow"), dealershipId, jobType);
     else await saveStageConfig(await getDb(), await actorForAction("admin.workflow"), dealershipId, jobType, stages);
   }, f.get("intent") === "reset" ? "Reset to the group default" : "Workflow saved");
-  revalidatePath("/admin/workflow");
   return res;
 }

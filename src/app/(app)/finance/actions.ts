@@ -1,5 +1,4 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
 import { actorForAction } from "@/server/auth";
 import { run, type ActionResult } from "@/server/action-result";
@@ -26,13 +25,11 @@ export async function manualTxnAction(_p: R, f: FormData) {
       notes: v(f, "notes"),
     });
   }, "Line recorded");
-  revalidatePath("/finance");
   return res;
 }
 
 export async function reconAction(_p: R, f: FormData) {
   const res = await run(async () => setReconciliation(await getDb(), await actorForAction("reconciliation.manage"), v(f, "id")!, v(f, "status") as ReconStatus));
-  revalidatePath("/finance");
   return res;
 }
 
@@ -53,7 +50,6 @@ export async function importAction(_p: ImportState, f: FormData): Promise<Import
     const r = await importTransactionsCsv(await getDb(), await actorForAction("imports.run"), fileName, csv, { dryRun });
     return { fileName, csv, dryRun, rowsTotal: r.rowsTotal, rowsAccepted: r.rowsAccepted, rowsRejected: r.rowsRejected, rowsDuplicate: r.rowsDuplicate, results: r.results.filter((x) => x.status !== "accepted").slice(0, 200) };
   });
-  if (!dryRun) revalidatePath("/finance", "layout");
   return res;
 }
 
@@ -67,6 +63,5 @@ export async function targetAction(_p: R, f: FormData) {
       approve: f.get("intent") === "approve",
     });
   }, f.get("intent") === "approve" ? "Target saved and approved" : "Target saved as draft (not used until approved)");
-  revalidatePath("/finance/targets");
   return res;
 }

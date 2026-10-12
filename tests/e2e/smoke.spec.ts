@@ -57,6 +57,21 @@ test("advisor: create a job card, move it forward, and see the audit timeline", 
   await expect(page.getByText("Record the customer/insurer approval before continuing")).toBeVisible();
 });
 
+test("regression: repeated create → move cycles never stall", async ({ page }) => {
+  // Guards against the stalled-navigation issue seen with a route-group loading boundary.
+  await login(page, "advisor.bmw@demo.kun.local");
+  for (let i = 0; i < 5; i++) {
+    await page.goto("/jobs/new");
+    await page.fill("input[name=registrationNo]", `RG${i}${Date.now().toString().slice(-5)}`);
+    await page.fill("input[name=customerName]", "Regression Customer");
+    await page.fill("textarea[name=complaint]", "Regression check");
+    await page.click("button:has-text('Create job card')");
+    await expect(page).toHaveURL(/\/jobs\/[0-9a-f-]{36}\?created=1/, { timeout: 10_000 });
+    await page.click("button:has-text('Move to Inspection & job card')");
+    await expect(page.getByText("Registered → Inspection & job card")).toBeVisible({ timeout: 10_000 });
+  }
+});
+
 test("advisor cannot open the group dashboard", async ({ page }) => {
   await login(page, "advisor.bmw@demo.kun.local");
   await page.goto("/group");

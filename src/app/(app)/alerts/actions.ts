@@ -1,5 +1,4 @@
 "use server";
-import { revalidatePath } from "next/cache";
 import { getDb } from "@/db/client";
 import { actorForAction } from "@/server/auth";
 import { run, type ActionResult } from "@/server/action-result";
@@ -15,7 +14,5 @@ export async function updateAlertAction(_p: ActionResult<unknown> | undefined, f
       resolutionNote: v("resolutionNote"),
     });
   }, "Action updated");
-  revalidatePath("/alerts");
-  revalidatePath("/group");
   return res;
 }

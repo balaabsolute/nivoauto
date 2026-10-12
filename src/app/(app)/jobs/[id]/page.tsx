@@ -15,9 +15,8 @@ import { ActionForm, Submit } from "@/components/ActionForm";
 import { StageChip, DueText, BLOCKER_LABELS } from "@/components/jobs";
 import { Icon } from "@/components/Icon";
 import {
-  transitionAction, updateJobAction, approvalAction, cancelAction, noteAction, checklistAction, addPartAction, partStatusAction, labourAction, photoAction,
+  transitionAction, updateJobAction, approvalAction, cancelAction, noteAction, checklistAction, addPartAction, partStatusAction, labourAction, photoAction, retryJobNotificationAction as retryNotificationAction,
 } from "../actions";
-import { retryNotificationAction } from "../../notifications/actions";
 
 export const metadata = { title: "Job card" };
 
