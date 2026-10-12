@@ -62,6 +62,9 @@ export interface CapacityMetric {
   completedThrough: string | null; // last completed day included (null = no completed day in period)
 }
 
+/** Gross profit / margin reporting is switched off until the definition is agreed (set GP_REPORTING=1 to re-enable). */
+const GP_REPORTING = process.env.GP_REPORTING === "1";
+
 export interface UnitMetrics {
   revenue: RevenueSummary;
   revenuePrev: RevenueSummary;
@@ -464,8 +467,9 @@ function signalsFor(d: DealerInfo, m: UnitMetrics, raw: Raw, period: Period, asO
     proRataRevenueTarget: completedTarget(raw, d.id, period, today),
     revenueCompletedDays: completedRevenue(raw, d.id, period, today),
     revenue: m.revenue.total,
-    marginPct: gpOk(m.revenue.gp),
-    marginPctPrev: gpOk(m.revenuePrev.gp),
+    // Gross profit / margin is not reported until Kun agrees its definition, so the margin rule stays off.
+    marginPct: GP_REPORTING ? gpOk(m.revenue.gp) : null,
+    marginPctPrev: GP_REPORTING ? gpOk(m.revenuePrev.gp) : null,
     overdueJobs: open.length,
     oldestOverdueDays: oldest,
     utilisationPct: m.capacity.service.utilisationPct,

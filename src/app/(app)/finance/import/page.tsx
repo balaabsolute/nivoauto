@@ -26,7 +26,7 @@ export default async function ImportPage() {
             <li>category: vehicle_sales, service_labour, parts, body_shop. Parts lines need parts_channel retail or workshop.</li>
             <li>kind: invoice, credit_note, booking_advance (not revenue), intercompany (excluded from group totals).</li>
             <li>source_ref must be unique per line (for example the system’s invoice line ID). Re-importing a file skips lines already imported.</li>
-            <li>Leave direct_cost_amount blank when unknown; gross profit is then shown as provisional or withheld.</li>
+            <li>direct_cost_amount is optional. It is stored for later use; gross profit is not reported until its definition is agreed.</li>
           </ul>
         </Panel>
       </div>

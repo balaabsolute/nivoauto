@@ -9,10 +9,10 @@ import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { DealerTable } from "@/components/dashboard/DealerTable";
 import {
-  HeadlineFigures, RevenueMixPanel, PipelinePanel, ShowroomPanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, toTableRows, BODYSHOP_COMMON_STAGES,
+  KpiCards, RevenueMixPanel, PipelinePanel, ShowroomPanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, toTableRows, BODYSHOP_COMMON_STAGES,
 } from "@/components/dashboard/sections";
 
-export const metadata = { title: "Group overview" };
+export const metadata = { title: "Overview" };
 
 export default async function GroupPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("group.dashboard");
@@ -25,7 +25,7 @@ export default async function GroupPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader
-        title="Group overview"
+        title="Overview"
         subtitle={
           <>
             {period.label}: {periodRangeLabel(period)}{includesToday && " (today in progress)"} · compared with {d.period.comparison.label}
@@ -41,7 +41,7 @@ export default async function GroupPage({ searchParams }: { searchParams: Promis
       ) : (
         <div className="space-y-4">
           <FreshnessStrip d={d} scopeLabel="dealerships" />
-          <HeadlineFigures m={d.total} showFinancials jobsHref="/jobs" />
+          <KpiCards m={d.total} dealers={d.dealers} showFinancials jobsHref="/jobs" query={q} />
 
           <div className="grid gap-4 xl:grid-cols-3">
             <Panel
@@ -54,18 +54,19 @@ export default async function GroupPage({ searchParams }: { searchParams: Promis
             <RevenueMixPanel m={d.total} />
           </div>
 
-          <Panel title="Dealership comparison" subtitle="Select a dealership to drill down. Sort any column.">
+          <Panel title="Dealership comparison" subtitle="Select a dealership to drill down. The top border shows its management signal.">
             <DealerTable rows={toTableRows(d.dealers)} query={q} />
           </Panel>
 
+          <InsightsPanel alerts={d.alerts} grid limit={9} />
+
           <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-            <InsightsPanel alerts={d.alerts} />
             <OperationalHealthPanel m={d.total} />
             <div className="space-y-4">
+              <ShowroomPanel m={d.total} href={`/leads/performance?${q}`} />
               <PipelinePanel m={d.total} />
-              <ShowroomPanel m={d.total} />
-              <StageQueue wip={d.total.bodyshopWip} stages={BODYSHOP_COMMON_STAGES} title="Body shop stage queue" subtitle="Vehicles in each stage now" href="/bodyshop" />
             </div>
+            <StageQueue wip={d.total.bodyshopWip} stages={BODYSHOP_COMMON_STAGES} title="Body shop stage queue" subtitle="Vehicles in each stage now" href="/bodyshop" />
           </div>
         </div>
       )}

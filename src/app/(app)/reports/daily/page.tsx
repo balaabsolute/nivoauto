@@ -145,13 +145,12 @@ export default async function DailyReportPage({ searchParams }: { searchParams: 
             <Panel title="Revenue by category (day)" bodyClassName="px-0 pb-0">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[640px] text-sm">
-                  <thead className="border-b border-line"><tr><th className="th">Dealership</th>{CATEGORY_ORDER.map((c) => <th key={c} className="th text-right">{CATEGORY_LABELS[c]}</th>)}<th className="th text-right">Gross profit</th></tr></thead>
+                  <thead className="border-b border-line"><tr><th className="th">Dealership</th>{CATEGORY_ORDER.map((c) => <th key={c} className="th text-right">{CATEGORY_LABELS[c]}</th>)}</tr></thead>
                   <tbody>
                     {data.day.dealers.map((r) => (
                       <tr key={r.dealer.id} className="border-b border-line last:border-0">
                         <td className="td">{r.dealer.name}</td>
                         {CATEGORY_ORDER.map((c) => <td key={c} className="td text-right num">{formatInrCompact(r.revenue.byCategory[c])}</td>)}
-                        <td className="td text-right num">{r.revenue.gp.amount != null ? <>{formatInrCompact(r.revenue.gp.amount)}{r.revenue.gp.status === "provisional" && <span className="text-warn text-xs"> prov.</span>}</> : <span className="text-xs text-ink-3">{r.revenue.gp.status === "insufficient" ? "cost incomplete" : "—"}</span>}</td>
                       </tr>
                     ))}
                   </tbody>

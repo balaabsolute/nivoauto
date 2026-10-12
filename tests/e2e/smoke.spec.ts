@@ -24,7 +24,7 @@ test("wrong password is rejected with a clear message", async ({ page }) => {
 test("MD: group overview → period change → dealership drill-down", async ({ page }) => {
   await login(page, "md@demo.kun.local");
   await expect(page).toHaveURL(/\/group/);
-  await expect(page.getByRole("heading", { name: "Group overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
   await expect(page.getByText("Every figure shown is synthetic")).toBeVisible();
   await expect(page.getByText("Total revenue")).toBeVisible();
   await page.getByRole("button", { name: "Year to date" }).click();

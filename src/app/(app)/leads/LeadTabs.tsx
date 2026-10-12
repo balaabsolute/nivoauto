@@ -1,7 +1,8 @@
 import Link from "next/link";
 import clsx from "clsx";
-export function LeadTabs({ current, canPublish }: { current: "list" | "followups" | "updates"; canPublish: boolean }) {
+export function LeadTabs({ current, canPublish }: { current: "performance" | "list" | "followups" | "updates"; canPublish: boolean }) {
   const tabs = [
+    { k: "performance", href: "/leads/performance", l: "Performance" },
     { k: "list", href: "/leads", l: "Enquiries" },
     { k: "followups", href: "/leads?view=followups", l: "Follow-ups due" },
     ...(canPublish ? [{ k: "updates", href: "/leads/updates", l: "Model updates (nurture)" }] : [{ k: "updates", href: "/leads/updates", l: "Model updates" }]),

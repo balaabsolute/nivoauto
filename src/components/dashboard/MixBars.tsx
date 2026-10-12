@@ -1,6 +1,6 @@
-import { formatInrCompact, formatPct } from "@/domain/format";
+import { formatInrCompact } from "@/domain/format";
 
-export interface MixRow { key: string; label: string; revenue: number; gpStatus: string; margin: number | null }
+export interface MixRow { key: string; label: string; revenue: number }
 
 /** Revenue mix as labelled horizontal bars — one measure, one hue, values printed. */
 export function MixBars({ rows, total }: { rows: MixRow[]; total: number }) {
@@ -18,9 +18,6 @@ export function MixBars({ rows, total }: { rows: MixRow[]; total: number }) {
             <div className="mt-1 h-2 rounded-r bg-line/60">
               <div className="h-full rounded-r" style={{ width: `${Math.max(0, (r.revenue / max) * 100)}%`, background: "#2a78d6" }} />
             </div>
-            <p className="text-xs text-ink-3 mt-0.5">
-              {r.gpStatus === "complete" || r.gpStatus === "provisional" ? <>GP margin {formatPct(r.margin)}{r.gpStatus === "provisional" && <span className="text-warn"> (provisional)</span>}</> : r.gpStatus === "insufficient" ? "GP withheld — cost data incomplete" : "No revenue in period"}
-            </p>
           </li>
         );
       })}

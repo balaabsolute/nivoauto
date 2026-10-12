@@ -31,7 +31,8 @@ workshop, informs the group dashboard and triggers customer updates.
 | Outcomes that stop nurture: sold, bought elsewhere (brand/model/dealer, can be a different car), not interested, opted out | enquiry page → *Close enquiry* |
 | Nurture: model updates sent to open enquiries for that model (consent-aware), with a call task per consultant | `/leads/updates` |
 | Future prospects from lounge feedback, tagged when the car is 5+ years old; convert to an enquiry at any group dealership | `/prospects` |
-| Showroom funnel on group and dealership dashboards | `/group`, `/dealerships/[id]` |
+| Sales performance & nurture KPIs for any period (today, MTD, previous month, quarter, YTD, custom), consultant table, lost-to brands, models | `/leads/performance` |
+| Showroom funnel on the Overview and dealership dashboards | `/group`, `/dealerships/[id]` |
 | Car model catalogue | `/admin/models` |
 
 Also included: appointments with check-in to a job card, manual revenue entry, validated CSV import with
@@ -98,7 +99,7 @@ Copy `.env.example` to `.env.local` (dev) or set variables in your host. All var
 | `ALLOW_DEMO_SEED` | — | `1` permits seeding under `NODE_ENV=production` (dedicated demo environment). |
 | `REPORTING_TZ` | `Asia/Kolkata` | Business-date time zone. |
 | `FY_START_MONTH` | `4` | Financial-year start month (April). Use `1` for calendar years. |
-| `GP_MIN_COVERAGE` | `0.8` | Minimum share of revenue with known cost before gross profit is shown. |
+| `GP_REPORTING` | off | Gross profit / margin reporting is switched off until its definition is agreed (see KPI definitions §2). |
 | `STALE_AFTER_HOURS` | `36` | No new records for this long ⇒ dealership flagged as stale. |
 | `SESSION_TTL_HOURS` | `12` | Session lifetime. |
 | `COOKIE_SECURE` | auto | Set `false` only if production is served over plain HTTP (not recommended). |

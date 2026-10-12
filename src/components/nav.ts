@@ -9,10 +9,10 @@ export interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { href: "/group", label: "Group overview", icon: "overview", caps: ["group.dashboard"] },
+  { href: "/group", label: "Overview", icon: "overview", caps: ["group.dashboard"] },
   { href: "/dealerships", label: "Dealerships", icon: "building", caps: ["dealership.dashboard"] },
   { href: "/front-desk", label: "Front desk", icon: "users", caps: ["frontdesk.view"] },
-  { href: "/leads", label: "Car enquiries", icon: "car", caps: ["leads.view"], match: "/leads" },
+  { href: "/leads/performance", label: "Car enquiries", icon: "car", caps: ["leads.view"], match: "/leads" },
   { href: "/prospects", label: "Future prospects", icon: "spark", caps: ["prospects.view"] },
   { href: "/jobs", label: "Service jobs", icon: "wrench", caps: ["jobs.view"] },
   { href: "/bodyshop", label: "Body shop", icon: "spray", caps: ["jobs.view"] },

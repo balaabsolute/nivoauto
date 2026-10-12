@@ -55,9 +55,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
 
       <div className="grid gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2 space-y-4">
-          <dl className="panel grid grid-cols-2 sm:grid-cols-4 divide-x divide-line">
+          <dl className="panel grid grid-cols-1 sm:grid-cols-3 divide-x divide-line">
             <div className="p-3"><dt className="text-xs text-ink-2">Revenue (filtered)</dt><dd className="text-lg font-semibold num">{formatInrCompact(sum.total)}</dd></div>
-            <div className="p-3"><dt className="text-xs text-ink-2">Gross profit</dt><dd className="text-lg font-semibold num">{sum.gp.amount != null ? formatInrCompact(sum.gp.amount) : "—"}</dd><dd className="text-xs text-ink-3">{sum.gp.status === "provisional" ? "provisional" : sum.gp.status === "insufficient" ? "cost data incomplete" : ""}</dd></div>
             <div className="p-3"><dt className="text-xs text-ink-2">Reconciled</dt><dd className="text-lg font-semibold num">{formatPct(sum.reconciledPct)}</dd></div>
             <div className="p-3"><dt className="text-xs text-ink-2">Excluded (advances / intercompany)</dt><dd className="text-lg font-semibold num">{formatInrCompact(sum.excluded.bookingAdvances + sum.excluded.intercompany)}</dd></div>
           </dl>
@@ -65,7 +64,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             {!rows.length ? <EmptyState title="No lines for these filters" icon="coins">Enter a line manually or import a CSV export.</EmptyState> : (
               <div className="overflow-x-auto max-h-[640px]">
                 <table className="w-full min-w-[860px] text-sm">
-                  <thead className="border-b border-line sticky top-0 bg-panel"><tr><th className="th">Date</th><th className="th">Dealership</th><th className="th">Category / kind</th><th className="th">Reference</th><th className="th text-right">Revenue (ex-tax)</th><th className="th text-right">Direct cost</th><th className="th">Source</th><th className="th">Reconciliation</th></tr></thead>
+                  <thead className="border-b border-line sticky top-0 bg-panel"><tr><th className="th">Date</th><th className="th">Dealership</th><th className="th">Category / kind</th><th className="th">Reference</th><th className="th text-right">Revenue (ex-tax)</th><th className="th">Source</th><th className="th">Reconciliation</th></tr></thead>
                   <tbody>
                     {rows.slice(0, 400).map(({ t, dealershipName }) => (
                       <tr key={t.id} className="border-b border-line last:border-0">
@@ -74,7 +73,6 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                         <td className="td">{CATEGORY_LABELS[t.category]}{t.partsChannel ? ` (${t.partsChannel})` : ""}{t.kind !== "invoice" && <div className="text-xs text-warn">{KIND[t.kind]}</div>}</td>
                         <td className="td text-xs">{t.invoiceRef}{t.jobId && <Link href={`/jobs/${t.jobId}`} className="block text-petrol">job</Link>}</td>
                         <td className="td text-right num">{formatInr(t.revenueAmount)}</td>
-                        <td className="td text-right num">{t.directCostAmount == null ? <span className="text-xs text-warn">missing</span> : formatInr(t.directCostAmount)}</td>
                         <td className="td text-xs">{t.source}</td>
                         <td className="td">
                           {canRecon ? (
@@ -110,7 +108,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
               <div className="grid grid-cols-2 gap-2">
                 <label><span className="label">Revenue ex-tax (₹)</span><input name="revenueAmount" inputMode="decimal" required className="field" /></label>
                 <label><span className="label">Tax (₹)</span><input name="taxAmount" inputMode="decimal" className="field" /></label>
-                <label><span className="label">Direct cost (₹)</span><input name="directCostAmount" inputMode="decimal" className="field" placeholder="Blank if unknown" /></label>
+
                 <label><span className="label">Vehicles (sales only)</span><input name="units" inputMode="numeric" className="field" /></label>
               </div>
               <label className="block"><span className="label">Note</span><input name="notes" className="field" /></label>

@@ -2,82 +2,127 @@ import Link from "next/link";
 import clsx from "clsx";
 import type { Dashboard, UnitMetrics, AlertView, DealerRow } from "@/server/analytics";
 import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/domain/revenue";
-import { formatInr, formatInrCompact, formatPct, formatInt, formatHours, relativeTime, formatDate } from "@/domain/format";
+import { formatInr, formatInrCompact, formatPct, formatInt, formatHours, relativeTime, formatDate, formatDelta } from "@/domain/format";
 import { describeEvidence } from "@/domain/alerts";
 import { COMMON_STAGE_LABELS, BODYSHOP_COMMON_STAGES, SERVICE_COMMON_STAGES, type CommonStage } from "@/domain/workflow";
 import { AGEING_BUCKETS } from "@/domain/kpi";
 import { growthPct } from "@/domain/kpi";
-import { Panel, Delta, SeverityChip, Chip, EmptyState, ProgressBar } from "@/components/ui";
+import { Panel, Delta, SeverityChip, EmptyState, ProgressBar } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { MixBars } from "./MixBars";
 import type { DealerTableRow } from "./DealerTable";
 
-/* ───────────── Headline figures ───────────── */
+/* ───────────── Headline KPI cards ───────────── */
 
-function Fig({ label, value, sub, note, href }: { label: string; value: React.ReactNode; sub?: React.ReactNode; note?: React.ReactNode; href?: string }) {
-  const inner = (
+
+type Tone = "good" | "warn" | "crit" | "petrol";
+const toneFor = (pct: number | null): Tone => (pct == null ? "petrol" : pct >= 100 ? "good" : pct >= 90 ? "warn" : "crit");
+const TONE_TEXT: Record<Tone, string> = { good: "text-good", warn: "text-warn", crit: "text-crit", petrol: "text-petrol" };
+
+function KpiCard({ label, value, href, children, accent }: { label: string; value: React.ReactNode; href?: string; children?: React.ReactNode; accent?: Tone }) {
+  const body = (
     <>
-      <dt className="text-[13px] text-ink-2">{label}</dt>
-      <dd className="mt-1 text-[26px] leading-none font-semibold tracking-tight num">{value}</dd>
-      {sub && <dd className="mt-1.5">{sub}</dd>}
-      {note && <dd className="mt-1 text-xs text-ink-3">{note}</dd>}
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-[13px] font-medium text-ink-2">{label}</h3>
+        {href && <span className="text-xs text-petrol" aria-hidden>View →</span>}
+      </div>
+      <p className={clsx("mt-2 text-[30px] leading-none font-semibold tracking-tight num", accent && TONE_TEXT[accent])}>{value}</p>
+      {children && <div className="mt-3 space-y-2">{children}</div>}
     </>
   );
-  return <div className="px-4 py-3.5 min-w-0">{href ? <Link href={href} className="block hover:opacity-80">{inner}</Link> : inner}</div>;
+  return (
+    <section className="panel p-4 min-w-0 flex flex-col">
+      {href ? <Link href={href} className="block hover:opacity-90">{body}</Link> : body}
+    </section>
+  );
 }
 
-export function HeadlineFigures({ m, showFinancials, jobsHref }: { m: UnitMetrics; showFinancials: boolean; jobsHref: string }) {
-  const gp = m.revenue.gp;
-  const gpp = m.revenuePrev.gp;
-  const gpOk = gp.status === "complete" || gp.status === "provisional";
-  const marginDelta = gpOk && (gpp.status === "complete" || gpp.status === "provisional") ? Math.round(((gp.marginPct ?? 0) - (gpp.marginPct ?? 0)) * 10) / 10 : null;
-  const svcRev = m.revenue.byCategory.service_labour;
-  const svcRevPrev = m.revenuePrev.byCategory.service_labour;
+function VsTarget({ pct, actual, target, fmt, unit }: { pct: number | null; actual: number; target: number | null; fmt: (n: number) => string; unit: string }) {
+  if (pct == null || target == null) return <p className="text-xs text-ink-3">No approved {unit} target for this period</p>;
+  const tone = toneFor(pct);
+  return (
+    <>
+      <ProgressBar value={Math.min(pct, 100)} max={100} tone={tone} label={`${unit} vs target`} />
+      <p className="text-xs text-ink-2 flex justify-between gap-2">
+        <span>Target {fmt(target)}</span>
+        <span className={clsx("font-medium num", TONE_TEXT[tone])}>{formatPct(pct)} achieved</span>
+      </p>
+      {actual < target && <p className="text-xs text-ink-3">{fmt(target - actual)} to go (pro-rated to the last completed day)</p>}
+    </>
+  );
+}
+
+/** Best performer = highest revenue achievement against approved target; falls back to growth, then revenue. */
+export function bestDealer(rows: DealerRow[]) {
+  const active = rows.filter((r) => r.revenue.total > 0);
+  const byTarget = active.filter((r) => r.revenueTargetAchievementPct != null).sort((a, b) => b.revenueTargetAchievementPct! - a.revenueTargetAchievementPct! || b.revenue.total - a.revenue.total);
+  if (byTarget.length) return { row: byTarget[0], runnerUp: byTarget[1] ?? null, basis: "target" as const };
+  const byGrowth = active.filter((r) => r.revenueGrowthPct != null).sort((a, b) => b.revenueGrowthPct! - a.revenueGrowthPct!);
+  if (byGrowth.length) return { row: byGrowth[0], runnerUp: byGrowth[1] ?? null, basis: "growth" as const };
+  const byRev = [...active].sort((a, b) => b.revenue.total - a.revenue.total);
+  return byRev.length ? { row: byRev[0], runnerUp: byRev[1] ?? null, basis: "revenue" as const } : null;
+}
+
+export function KpiCards({ m, dealers, showFinancials, jobsHref, query, dealerCard }: { m: UnitMetrics; dealers?: DealerRow[]; showFinancials: boolean; jobsHref: string; query?: string; dealerCard?: React.ReactNode }) {
   const open = m.service.openAtEnd + m.bodyshop.openAtEnd;
   const overdue = m.service.overdueAtEnd + m.bodyshop.overdueAtEnd;
+  const overduePct = open ? (overdue / open) * 100 : null;
+  const best = dealers ? bestDealer(dealers) : null;
+  const deliveredTargetActual = m.deliveriesTarget != null && m.deliveriesAchievementPct != null ? (m.deliveriesAchievementPct / 100) * m.deliveriesTarget : m.revenue.vehiclesDelivered;
   return (
-    <dl className="panel grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 divide-x divide-y xl:divide-y-0 divide-line">
+    <div className={clsx("grid gap-4 sm:grid-cols-2", showFinancials ? "xl:grid-cols-4" : "xl:grid-cols-3")}>
       {showFinancials && (
-        <Fig
-          label="Total revenue"
-          value={formatInrCompact(m.revenue.total)}
-          sub={<Delta value={m.revenueGrowthPct} label="vs prior" />}
-          note={m.revenueTargetAchievementPct != null ? <>{formatPct(m.revenueTargetAchievementPct)} of approved target{m.revenueTargetCoverage.withTarget < m.revenueTargetCoverage.total && ` (${m.revenueTargetCoverage.withTarget} of ${m.revenueTargetCoverage.total} dealerships)`}</> : "No approved target"}
-        />
+        <KpiCard label="Total revenue vs target" value={formatInrCompact(m.revenue.total)}>
+          <Delta value={m.revenueGrowthPct} label="vs comparison period" />
+          <VsTarget pct={m.revenueTargetAchievementPct} actual={m.revenue.total} target={m.revenueTarget} fmt={formatInrCompact} unit="revenue" />
+          {m.revenueTargetAchievementPct != null && m.revenueTargetCoverage.withTarget < m.revenueTargetCoverage.total && (
+            <p className="text-xs text-warn">Target set for {m.revenueTargetCoverage.withTarget} of {m.revenueTargetCoverage.total} dealerships</p>
+          )}
+        </KpiCard>
       )}
-      {showFinancials && (
-        <Fig
-          label="Gross profit"
-          value={gpOk ? formatInrCompact(gp.amount) : "—"}
-          sub={gp.status === "provisional" ? <Chip tone="warn">Provisional</Chip> : gp.status === "insufficient" ? <Chip tone="neutral">Cost data incomplete</Chip> : undefined}
-          note={gp.coveragePct != null ? `Cost known for ${formatPct(gp.coveragePct)} of revenue` : undefined}
-        />
-      )}
-      {showFinancials && (
-        <Fig label="Gross margin" value={gpOk ? formatPct(gp.marginPct) : "—"} sub={<Delta value={marginDelta} unit="pp" label="vs prior" />} />
-      )}
-      <Fig
-        label="Vehicles delivered"
-        value={formatInt(m.revenue.vehiclesDelivered)}
-        sub={<Delta value={growthPct(m.revenue.vehiclesDelivered, m.revenuePrev.vehiclesDelivered || null)} label="vs prior" />}
-        note={m.deliveriesAchievementPct != null ? `${formatPct(m.deliveriesAchievementPct)} of delivery target` : undefined}
-      />
-      {showFinancials && <Fig label="Service revenue" value={formatInrCompact(svcRev)} sub={<Delta value={growthPct(svcRev, svcRevPrev || null)} label="vs prior" />} note="Labour & repairs; parts reported separately" />}
-      <Fig label="Open jobs" value={formatInt(open)} note={`${formatInt(m.service.openAtEnd)} service · ${formatInt(m.bodyshop.openAtEnd)} body shop`} href={jobsHref} />
-      <Fig
-        label="Overdue jobs"
-        value={<span className={clsx(overdue > 0 && "text-crit")}>{formatInt(overdue)}</span>}
-        note="Open past the promised delivery time"
-        href={`${jobsHref}${jobsHref.includes("?") ? "&" : "?"}overdue=1`}
-      />
-    </dl>
+      <KpiCard label="Vehicles delivered vs target" value={formatInt(m.revenue.vehiclesDelivered)}>
+        <Delta value={growthPct(m.revenue.vehiclesDelivered, m.revenuePrev.vehiclesDelivered || null)} label="vs comparison period" />
+        <VsTarget pct={m.deliveriesAchievementPct} actual={deliveredTargetActual} target={m.deliveriesTarget} fmt={(n) => formatInt(Math.round(n))} unit="delivery" />
+      </KpiCard>
+      <KpiCard label="Open jobs vs overdue" value={<>{formatInt(open)} <span className="text-lg font-medium text-ink-3">/</span> <span className={clsx(overdue > 0 ? "text-crit" : "text-good")}>{formatInt(overdue)}</span></>} href={`${jobsHref}${jobsHref.includes("?") ? "&" : "?"}overdue=1`}>
+        <ProgressBar value={overduePct} max={100} tone={overdue === 0 ? "good" : (overduePct ?? 0) > 20 ? "crit" : "warn"} label="Share of open jobs overdue" />
+        <p className="text-xs text-ink-2 flex justify-between gap-2"><span>{overduePct == null ? "No open jobs" : `${formatPct(overduePct)} of open jobs overdue`}</span></p>
+        <p className="text-xs text-ink-3">Service {formatInt(m.service.openAtEnd)} open · {formatInt(m.service.overdueAtEnd)} overdue<br />Body shop {formatInt(m.bodyshop.openAtEnd)} open · {formatInt(m.bodyshop.overdueAtEnd)} overdue</p>
+      </KpiCard>
+      {dealerCard ?? (best ? (
+        <KpiCard label="Best performing dealership" value={<span className="text-[24px]">{best.row.dealer.name}</span>} href={`/dealerships/${best.row.dealer.id}${query ? `?${query}` : ""}`} accent="good">
+          <p className="text-sm">
+            {best.basis === "target" ? <><span className="font-semibold text-good num">{formatPct(best.row.revenueTargetAchievementPct)}</span> of revenue target</>
+              : best.basis === "growth" ? <><span className="font-semibold text-good num">{formatDelta(best.row.revenueGrowthPct)}</span> revenue growth</>
+              : <>Highest revenue</>}
+            {showFinancials && <span className="text-ink-2"> · {formatInrCompact(best.row.revenue.total)}</span>}
+          </p>
+          <p className="text-xs text-ink-3">{formatInt(best.row.revenue.vehiclesDelivered)} vehicles delivered{best.row.deliveriesAchievementPct != null ? ` (${formatPct(best.row.deliveriesAchievementPct)} of target)` : ""}</p>
+          {best.runnerUp && <p className="text-xs text-ink-3 border-t border-line pt-2">Next: {best.runnerUp.dealer.name}{best.basis === "target" ? ` · ${formatPct(best.runnerUp.revenueTargetAchievementPct)}` : ""}</p>}
+          <p className="text-[11px] text-ink-3">Ranked by {best.basis === "target" ? "revenue achieved against approved target" : best.basis === "growth" ? "revenue growth (no approved targets)" : "revenue"}</p>
+        </KpiCard>
+      ) : (
+        <KpiCard label="Best performing dealership" value="—"><p className="text-xs text-ink-3">No revenue recorded for this period</p></KpiCard>
+      ))}
+    </div>
+  );
+}
+
+/** Drill-down fourth card: workshop utilisation. */
+export function UtilisationCard({ m }: { m: UnitMetrics }) {
+  const u = m.capacity.service.utilisationPct;
+  return (
+    <KpiCard label="Service bay utilisation" value={formatPct(u)} accent={u == null ? undefined : u > 95 ? "crit" : u < 50 ? "warn" : undefined}>
+      <ProgressBar value={u} max={100} tone={u == null ? "petrol" : u > 95 ? "crit" : u < 50 ? "warn" : "petrol"} label="Service bay utilisation" />
+      <p className="text-xs text-ink-3">{m.capacity.service.units ? `${formatInt(m.capacity.service.used)} of ${formatInt(m.capacity.service.available)} productive hours, completed days` : "No capacity profile set"}</p>
+    </KpiCard>
   );
 }
 
 /* ───────────── Revenue mix ───────────── */
 
 export function RevenueMixPanel({ m }: { m: UnitMetrics }) {
-  const rows = CATEGORY_ORDER.map((c) => ({ key: c, label: CATEGORY_LABELS[c], revenue: m.revenue.byCategory[c], gpStatus: m.revenue.gpByCategory[c].status, margin: m.revenue.gpByCategory[c].marginPct }));
+  const rows = CATEGORY_ORDER.map((c) => ({ key: c, label: CATEGORY_LABELS[c], revenue: m.revenue.byCategory[c] }));
   const ex = m.revenue.excluded;
   return (
     <Panel title="Revenue mix" subtitle="Each invoice line counted once, ex-tax">
@@ -135,7 +180,7 @@ export function PipelinePanel({ m }: { m: UnitMetrics }) {
 
 /* ───────────── Showroom funnel (front desk + enquiries) ───────────── */
 
-export function ShowroomPanel({ m, href = "/leads" }: { m: UnitMetrics; href?: string }) {
+export function ShowroomPanel({ m, href = "/leads/performance" }: { m: UnitMetrics; href?: string }) {
   const f = m.showroom;
   if (!f.walkInsTotal && !f.enquiries && !f.closed && !f.openAtEnd) {
     return (
@@ -153,7 +198,7 @@ export function ShowroomPanel({ m, href = "/leads" }: { m: UnitMetrics; href?: s
     ["Close rate", formatPct(f.closeRatePct)],
   ];
   return (
-    <Panel title="Showroom" subtitle="From the kiosk, front desk and enquiry records" actions={<Link href={href} className="text-sm text-petrol hover:underline">Enquiries</Link>}>
+    <Panel title="Showroom" subtitle="From the kiosk, front desk and enquiry records" actions={<Link href={href} className="text-sm text-petrol hover:underline">Sales performance</Link>}>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
         {items.map(([l, v]) => (
           <div key={l}><dt className="text-xs text-ink-2">{l}</dt><dd className="text-xl font-semibold num">{v}</dd></div>
@@ -257,7 +302,7 @@ export function BodyShopPanel({ m }: { m: UnitMetrics }) {
 
 /* ───────────── Management insights ───────────── */
 
-export function InsightsPanel({ alerts, limit = 6, showDealer = true }: { alerts: AlertView[]; limit?: number; showDealer?: boolean }) {
+export function InsightsPanel({ alerts, limit = 6, showDealer = true, grid = false }: { alerts: AlertView[]; limit?: number; showDealer?: boolean; grid?: boolean }) {
   const shown = alerts.filter((a) => a.status !== "resolved" && a.status !== "dismissed").slice(0, limit);
   return (
     <Panel
@@ -269,9 +314,9 @@ export function InsightsPanel({ alerts, limit = 6, showDealer = true }: { alerts
       {!shown.length ? (
         <EmptyState title="No exceptions for this period" icon="check">Every rule is within its threshold. Thresholds are listed in the KPI definitions.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line">
+        <ul className={clsx(grid ? "grid gap-3 px-4 pb-3 md:grid-cols-2 xl:grid-cols-3" : "divide-y divide-line")}>
           {shown.map((a) => (
-            <li key={a.fingerprint} className="px-4 py-3">
+            <li key={a.fingerprint} className={clsx(grid ? "rounded-lg border border-line p-3 border-l-4" : "px-4 py-3", grid && (a.severity === "critical" ? "border-l-crit" : a.severity === "warning" ? "border-l-warn" : "border-l-petrol"))}>
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityChip severity={a.severity} />
                 <span className="font-medium text-sm">{a.title}</span>
@@ -304,12 +349,10 @@ export function FreshnessStrip({ d, scopeLabel }: { d: Dashboard; scopeLabel: st
   const f = d.total.freshness;
   const staleDealers = d.dealers.filter((r) => r.freshness.stale && r.freshness.hasAnyData);
   const lastUpdate = [f.lastTransactionAt, f.lastJobActivityAt].filter(Boolean).sort((a, b) => b!.getTime() - a!.getTime())[0] ?? null;
-  const gp = d.total.revenue.gp;
   const items = [
     { label: "Last update", value: relativeTime(lastUpdate), warn: f.stale },
     { label: "Reporting coverage", value: `${d.coverage.dealershipsReporting} of ${d.coverage.dealershipsTotal} ${scopeLabel}`, warn: d.coverage.dealershipsReporting < d.coverage.dealershipsTotal },
     { label: "Daily reports", value: f.dailyReportsExpected ? `${f.dailyReportsSubmitted} of ${f.dailyReportsExpected}` : "—", warn: f.dailyReportsSubmitted < f.dailyReportsExpected },
-    { label: "Lines missing cost", value: formatInt(f.linesMissingCost), warn: f.linesMissingCost > 0 },
     { label: "Unreconciled revenue", value: `${formatInrCompact(f.unreconciledAmount)} (${formatInt(f.unreconciledLines)} lines)`, warn: f.unreconciledLines > 0 },
     { label: "Reconciled", value: formatPct(d.total.revenue.reconciledPct), warn: (d.total.revenue.reconciledPct ?? 0) < 100 },
   ];
@@ -323,13 +366,10 @@ export function FreshnessStrip({ d, scopeLabel }: { d: Dashboard; scopeLabel: st
           </span>
         ))}
       </div>
-      {(staleDealers.length > 0 || gp.status === "provisional" || gp.status === "insufficient") && (
+      {staleDealers.length > 0 && (
         <ul className="mt-2 space-y-1 text-xs">
           {staleDealers.length > 0 && (
             <li className="text-warn flex items-start gap-1.5"><Icon name="alert" className="h-3.5 w-3.5 mt-px shrink-0" />No new records in the last {Math.round(Number(process.env.STALE_AFTER_HOURS ?? 36))} hours from {staleDealers.map((s) => s.dealer.name).join(", ")}. Their figures may be incomplete.</li>
-          )}
-          {gp.status !== "complete" && gp.status !== "no_revenue" && (
-            <li className="text-ink-2 flex items-start gap-1.5"><Icon name="info" className="h-3.5 w-3.5 mt-px shrink-0" />Gross profit is {gp.status === "provisional" ? "provisional" : "withheld"}: direct cost is known for {formatPct(gp.coveragePct)} of revenue. Figures are management information, not statutory consolidated accounts.</li>
           )}
         </ul>
       )}
@@ -351,8 +391,7 @@ export function toTableRows(rows: DealerRow[]): DealerTableRow[] {
       revenue: r.revenue.total,
       revenueGrowth: r.revenueGrowthPct,
       targetPct: r.revenueTargetAchievementPct,
-      gpMargin: r.revenue.gp.marginPct,
-      gpStatus: r.revenue.gp.status,
+      deliveredPct: r.deliveriesAchievementPct,
       delivered: r.revenue.vehiclesDelivered,
       serviceOpen: r.service.openAtEnd,
       serviceOverdue: r.service.overdueAtEnd,

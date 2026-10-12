@@ -13,7 +13,7 @@ import { PageHeader, Panel, Chip, EmptyState, ProgressBar } from "@/components/u
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import {
-  HeadlineFigures, RevenueMixPanel, PipelinePanel, ShowroomPanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, BodyShopPanel, BODYSHOP_COMMON_STAGES, SERVICE_COMMON_STAGES,
+  KpiCards, UtilisationCard, RevenueMixPanel, PipelinePanel, ShowroomPanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, BodyShopPanel, BODYSHOP_COMMON_STAGES, SERVICE_COMMON_STAGES,
 } from "@/components/dashboard/sections";
 
 export const metadata = { title: "Dealership" };
@@ -41,7 +41,7 @@ export default async function DealershipPage({ params, searchParams }: { params:
   return (
     <>
       <PageHeader
-        back={isGroupWide(actor) ? { href: `/group?${periodQuery(period)}`, label: "Group overview" } : undefined}
+        back={isGroupWide(actor) ? { href: `/group?${periodQuery(period)}`, label: "Overview" } : undefined}
         title={dealer.name}
         subtitle={
           <>
@@ -56,7 +56,7 @@ export default async function DealershipPage({ params, searchParams }: { params:
       />
       <div className="space-y-4">
         <FreshnessStrip d={d} scopeLabel="dealership" />
-        <HeadlineFigures m={m} showFinancials={showFin} jobsHref={`/jobs?dealer=${id}`} />
+        <KpiCards m={m} showFinancials={showFin} jobsHref={`/jobs?dealer=${id}`} dealerCard={<UtilisationCard m={m} />} />
 
         {showFin && (
           <div className="grid gap-4 xl:grid-cols-3">
@@ -67,13 +67,14 @@ export default async function DealershipPage({ params, searchParams }: { params:
           </div>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <InsightsPanel alerts={row.alerts} showDealer={false} />
+        <InsightsPanel alerts={row.alerts} showDealer={false} grid limit={9} />
+
+        <div className={`grid gap-4 lg:grid-cols-2 ${dealer.hasSales ? "" : "xl:grid-cols-2"}`}>
           <OperationalHealthPanel m={m} hasBodyShop={dealer.hasBodyShop} />
           {dealer.hasSales && (
             <div className="space-y-4">
               <PipelinePanel m={m} />
-              <ShowroomPanel m={m} href={`/leads?dealer=${id}&status=all`} />
+              <ShowroomPanel m={m} href={`/leads/performance?dealer=${id}&${periodQuery(period)}`} />
             </div>
           )}
         </div>
@@ -84,7 +85,6 @@ export default async function DealershipPage({ params, searchParams }: { params:
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
               {showFin && <div><dt className="text-xs text-ink-2">Retail parts revenue</dt><dd className="text-lg font-semibold num">{formatInrCompact(m.parts.retail)}</dd></div>}
               {showFin && <div><dt className="text-xs text-ink-2">Parts used in workshop</dt><dd className="text-lg font-semibold num">{formatInrCompact(m.parts.workshop)}</dd></div>}
-              {showFin && <div><dt className="text-xs text-ink-2">Parts gross margin</dt><dd className="text-lg font-semibold num">{["complete", "provisional"].includes(m.revenue.gpByCategory.parts.status) ? formatPct(m.revenue.gpByCategory.parts.marginPct) : "—"}</dd></div>}
               <div><dt className="text-xs text-ink-2">Part lines issued to jobs</dt><dd className="text-lg font-semibold num">{formatInt(m.parts.linesIssued)}</dd></div>
               <div><dt className="text-xs text-ink-2">Jobs delayed by parts now</dt><dd className="text-lg font-semibold num">{formatInt(m.parts.jobsDelayedByParts)}</dd></div>
             </dl>

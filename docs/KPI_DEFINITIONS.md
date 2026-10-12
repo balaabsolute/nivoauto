@@ -31,6 +31,11 @@ Headline revenue still includes today’s recorded lines, and the UI marks the p
 
 ## 2. Revenue and gross profit (`src/domain/revenue.ts`)
 
+> **Gross profit and margin are not shown anywhere in the app** until Kun agrees how they are defined
+> (decision of 12 Oct 2026). The rules below remain in code and tests; direct cost is still accepted on
+> import and stored. The "revenue up, margin down" alert is off. Set `GP_REPORTING=1` to re-enable the alert
+> once the definition is agreed (the UI would also need to be switched back on).
+
 **Total revenue = vehicle sales + service labour & repairs + spare parts + body shop**, ex-tax.
 
 Double-counting safeguards:
@@ -100,7 +105,7 @@ revenue per delivered job where linked revenue exists.
 
 ## 7. Spare parts KPIs
 
-Retail vs workshop parts revenue; parts gross margin (same GP rules); part lines issued to jobs in the
+Retail vs workshop parts revenue; part lines issued to jobs in the
 period; jobs currently delayed by parts. Stock-outs and ageing inventory are **not** shown until reliable
 inventory data exists (brief §6.4).
 
@@ -133,6 +138,38 @@ from lounge-prospect updates. Service-update consent is separate and unaffected.
 
 Lounge prospects: the *upgrade due* tag means purchase year ≤ current year − 5 (`UPGRADE_AGE_YEARS`,
 default 5). Prospect ranking score combines interest, timeframe and car age (`prospectScore`).
+
+### 8b. Sales performance and nurture (`src/domain/sales-kpis.ts`, `/leads/performance`)
+
+All measures use the selected period [from, to) — today, month to date, previous month, quarter, year to date
+or custom — and compare with the matching comparison period.
+
+| Measure | Rule |
+|---|---|
+| New enquiries | Created in the period; top source shown |
+| Test drives completed | Completed in the period. Test-drive rate = enquiries created in the period with a completed test drive ÷ enquiries created |
+| Cars sold (won) | Enquiries closed as won in the period |
+| Close rate | Won ÷ enquiries closed in the period |
+| Lost to competition | Closed as *bought elsewhere* in the period, and its share of closed; brands ranked |
+| Median days to sale | Median of (closed − created) for enquiries won in the period |
+| Pipeline now | Open enquiries now; hot = timeframe immediate or within a month; unassigned; open follow-ups past due; open enquiries with no open follow-up |
+| Contacted within 24 h | Enquiries created in the period whose first call, visit, message or test drive came within 24 h ÷ enquiries created. Median first-contact time shown |
+| Follow-ups completed | Follow-ups **due** in the period marked done ÷ due. On time = done within 24 h of the due time |
+| Customers reached | Distinct enquiries sent a model update (status sent) in the period |
+| Engaged after an update | Of those reached, enquiries with a call, visit, message, completed test drive or sale recorded **after** the first update in the period |
+| Opt-outs | Enquiries closed as opted out in the period; plus the share of open enquiries that can currently receive updates |
+| Consultant table | The same measures per assigned consultant; contacts are activities logged by that user |
+
+**Lounge prospects** (`/prospects`): responses in the period (vs comparison); upgrade due = purchase year ≤
+current year − 5; looking now / maybe / not now; ready within 3 months = looking now and buying in ≤ 3
+months; another brand = a preferred model from a brand other than their current car; agreed to offers
+(interested respondents); contacted = status contacted or converted; converted to enquiries = enquiries
+created from a prospect in the period; converted enquiries sold = those won in the period; prospects sent
+model updates = prospects messaged directly in the period.
+
+**Best performing dealership** (Overview): highest revenue achievement against its approved, pro-rated target
+for the period. Without approved targets it falls back to revenue growth, then to revenue; the basis is
+printed on the card.
 
 ## 9. Management alerts (`src/domain/alerts.ts`)
 

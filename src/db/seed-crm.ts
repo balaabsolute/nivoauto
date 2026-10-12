@@ -196,11 +196,11 @@ export async function seedCrmDemo(db: DB, ctx: {
           }
         }
         const stage: s.LeadStage = status === "won" ? "booked" : hadDrive ? (status === "open" && chance(0.4) ? "negotiation" : "test_drive") : "enquiry";
-        const timeframe = pick(["immediate", "within_1m", "within_1m", "1_3m", "1_3m", "3_6m"] as const);
+        const timeframe = pick(["immediate", "within_1m", "1_3m", "1_3m", "3_6m", "3_6m", "6_12m"] as const);
         const band = pick(BUDGET_BY_BRAND[p.brand] ?? ["10_15l"]);
         const [bMin, bMax] = BUDGET_RANGES[band];
         const lastContactAt = ageDays > 1 ? biz(new Date(createdAt.getTime() + between(0.5, Math.max(0.6, Math.min(ageDays, 10))) * DAY), closedAt ?? pNow) : null;
-        const nextFollowUpAt = status === "open" ? (chance(0.25) ? biz(new Date(pNow.getTime() - between(2, 60) * HOUR), pNow) : biz(new Date(pNow.getTime() + between(2, 96) * HOUR))) : null;
+        const nextFollowUpAt = status === "open" ? (chance(0.12) ? biz(new Date(pNow.getTime() - between(2, 60) * HOUR), pNow) : biz(new Date(pNow.getTime() + between(2, 96) * HOUR))) : null;
         const rival = luxury ? pick(LUX_RIVALS) : pick(MASS_RIVALS);
         leadRows.push({
           id, leadNo, dealershipId: d.id, customerId: "", source: isWalk ? "walk_in" : chance(0.6) ? "phone" : "web", walkInId: null, consultantId: consultant?.id ?? null,
@@ -213,6 +213,19 @@ export async function seedCrmDemo(db: DB, ctx: {
         actRows.push({ leadId: id, type: "created", text: isWalk ? "Showroom walk-in (kiosk)" : "Enquiry recorded", userId: isWalk ? null : consultant?.id ?? null, at: createdAt });
         if (consultant) actRows.push({ leadId: id, type: "assignment", text: `Assigned to ${consultant.name}`, userId: consultant.id, at: new Date(createdAt.getTime() + 5 * 60_000) });
         if (lastContactAt) actRows.push({ leadId: id, type: "call", text: pick(CALL_NOTES), userId: consultant?.id ?? null, at: lastContactAt });
+        // First contact: most within a working day of the enquiry.
+        const firstCall = new Date(createdAt.getTime() + (chance(0.72) ? between(0.3, 20) : between(24, 72)) * HOUR);
+        if (firstCall < (closedAt ?? pNow) && (!lastContactAt || firstCall < lastContactAt)) actRows.push({ leadId: id, type: "call", text: "First call: needs and budget discussed", userId: consultant?.id ?? null, at: firstCall });
+        // Follow-up history every few days until the enquiry closed (or now): mostly done, some late or skipped.
+        for (let due = new Date(createdAt.getTime() + between(2, 4) * DAY); due < (closedAt ?? new Date(pNow.getTime() - DAY)); due = new Date(due.getTime() + between(3, 7) * DAY)) {
+          const r2 = rnd();
+          const done = r2 < 0.82;
+          const completedAt = done ? new Date(due.getTime() + (chance(0.78) ? between(-3, 18) : between(26, 72)) * HOUR) : null;
+          fuRows.push({
+            leadId: id, assignedToId: consultant?.id ?? null, dueAt: due, kind: "call", reason: hadDrive ? "Follow up after test drive" : "Follow up on enquiry",
+            status: done ? "done" : "skipped", completedAt: completedAt ?? due, completedById: consultant?.id ?? null, outcomeNote: done ? pick(CALL_NOTES) : "Customer unreachable", createdAt,
+          });
+        }
         if (closed && closedAt) {
           const text = status === "won" ? "Sale won" : status === "lost_other_dealer" ? `Bought elsewhere: ${rival}` : status === "not_interested" ? `Not interested: ${leadRows[leadRows.length - 1].closeReason}` : "Customer asked not to be contacted — marketing opt-out recorded";
           actRows.push({ leadId: id, type: "outcome", text, userId: consultant?.id ?? null, at: closedAt });
@@ -286,7 +299,7 @@ export async function seedCrmDemo(db: DB, ctx: {
           budgetBand: interest === "no" ? null : pick(BUDGET_BY_BRAND[upgradeBrand?.name ?? p.brand] ?? ["10_15l"]),
           preferredBodyType: interest === "no" ? null : prefModels[0]?.bodyType ?? null, preferredFuel: interest === "no" ? null : chance(0.3) ? "ev" : null,
           preferredModelIds: prefModels.map((m) => m.id), otherPreferences: interest !== "no" && chance(0.25) ? pick(["Needs 7 seats", "Sunroof", "Automatic gearbox", "Lower running cost"]) : null,
-          status: ageDays > 14 && interest !== "no" ? (chance(0.3) ? "contacted" : chance(0.1) ? "not_now" : "new") : "new", isDemo: true, createdAt: at,
+          status: ageDays > 2 && interest !== "no" ? (chance(Math.min(0.6, ageDays / 20)) ? "contacted" : chance(0.08) ? "not_now" : "new") : "new", isDemo: true, createdAt: at,
         });
       }
     }

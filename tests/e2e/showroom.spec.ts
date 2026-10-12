@@ -103,3 +103,18 @@ test("lounge feedback lands in future prospects", async ({ browser }) => {
   await expect(page.getByText(/Converted from lounge feedback/)).toBeVisible();
   await ctx.close();
 });
+
+test("sales and prospect KPIs follow the selected period", async ({ page }) => {
+  await login(page, "manager.hyu@demo.kun.local");
+  await page.goto("/leads/performance");
+  await expect(page.getByText("New enquiries")).toBeVisible();
+  await expect(page.getByText("Engaged after an update", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Year to date" }).click();
+  await expect(page).toHaveURL(/period=ytd/);
+  await expect(page.getByText(/Year to date \(FY/).first()).toBeVisible();
+  await page.goto("/prospects");
+  await page.getByRole("button", { name: "Previous month" }).click();
+  await expect(page).toHaveURL(/period=prev_month/);
+  await expect(page.getByText("Lounge responses")).toBeVisible();
+  await expect(page.getByText(/Gross profit|Gross margin/)).toHaveCount(0);
+});
