@@ -183,6 +183,14 @@ describe("service job workflow", () => {
     expect(j2.customerId).toBe(j1.customerId);
   });
 
+  it("job numbers continue from the highest existing number, even with gaps", async () => {
+    const j = await newJob();
+    const prefix = j.jobNo.slice(0, -4);
+    await db.update(s.jobs).set({ jobNo: `${prefix}0040` }).where(eq(s.jobs.id, j.id)); // simulate a gap
+    const k = await newJob();
+    expect(k.jobNo).toBe(`${prefix}0041`);
+  });
+
   it("validates required fields", async () => {
     await expect(newJob({ complaint: "" })).rejects.toBeInstanceOf(ValidationError);
     await expect(newJob({ registrationNo: "" })).rejects.toBeInstanceOf(ValidationError);

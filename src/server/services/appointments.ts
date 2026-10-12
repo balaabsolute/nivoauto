@@ -26,6 +26,7 @@ export async function createAppointment(db: DB, actor: Actor, raw: z.input<typeo
   if (!opts.allowPast && input.scheduledAt.getTime() < Date.now() - 15 * 60_000) throw new ValidationError(["Appointment time is in the past"]);
   const [dealer] = await db.select().from(dealerships).where(eq(dealerships.id, input.dealershipId));
   if (!dealer) throw new ValidationError(["Dealership not found"]);
+  opts = { ...opts, isDemo: opts.isDemo ?? dealer.isDemo };
 
   const appt = await db.transaction(async (txRaw) => {
     const tx = txRaw as unknown as DB;

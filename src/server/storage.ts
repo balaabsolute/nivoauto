@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { ValidationError } from "./errors";
 
 /**
  * File storage adapter for job photos. Default: local disk under UPLOAD_DIR (./uploads).
@@ -18,8 +19,8 @@ const ALLOWED = new Map([
 
 export async function saveUpload(prefix: string, file: { name: string; type: string; bytes: Uint8Array }): Promise<string> {
   const ext = ALLOWED.get(file.type);
-  if (!ext) throw new Error("Only JPEG, PNG, WebP or HEIC photos are accepted");
-  if (file.bytes.byteLength > MAX_UPLOAD_BYTES) throw new Error(`Photo exceeds ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`);
+  if (!ext) throw new ValidationError(["Only JPEG, PNG, WebP or HEIC photos are accepted"]);
+  if (file.bytes.byteLength > MAX_UPLOAD_BYTES) throw new ValidationError([`Photo exceeds ${MAX_UPLOAD_BYTES / 1024 / 1024} MB`]);
   const key = `${prefix.replace(/[^a-zA-Z0-9/_-]/g, "")}/${randomUUID()}${ext}`;
   const full = path.join(UPLOAD_DIR, key);
   await fs.mkdir(path.dirname(full), { recursive: true });

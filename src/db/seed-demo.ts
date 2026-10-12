@@ -20,7 +20,8 @@ import { hashPassword } from "@/server/password";
 import { renderTemplate } from "@/domain/notifications";
 import { SERVICE_CHECKLIST, BODYSHOP_CHECKLIST } from "@/server/services/jobs";
 
-export const DEMO_PASSWORD = "demo-pass-2026";
+export { DEMO_PASSWORD } from "./demo-constants";
+import { DEMO_PASSWORD } from "./demo-constants";
 
 /* ───────────── deterministic randomness ───────────── */
 function mulberry32(a: number) {
@@ -96,20 +97,34 @@ export async function removeDemoData(db: DB) {
   const demoDealers = (await db.select({ id: s.dealerships.id }).from(s.dealerships).where(eq(s.dealerships.isDemo, true))).map((d) => d.id);
   const demoUsers = (await db.select({ id: s.users.id }).from(s.users).where(eq(s.users.isDemo, true))).map((u) => u.id);
   const inDealers = (col: Parameters<typeof inArray>[0]) => (demoDealers.length ? inArray(col, demoDealers) : sql`false`);
+  // Everything flagged demo, plus anything (however created) that belongs to a demo dealership.
+  const demoOr = (flag: Parameters<typeof eq>[0], dealerCol: Parameters<typeof inArray>[0]) => or(eq(flag, true), inDealers(dealerCol));
   await db.delete(s.alerts).where(inDealers(s.alerts.dealershipId));
-  await db.delete(s.notifications).where(eq(s.notifications.isDemo, true));
-  await db.delete(s.transactions).where(eq(s.transactions.isDemo, true));
-  await db.delete(s.labourLogs).where(eq(s.labourLogs.isDemo, true));
-  await db.execute(sql`update appointments set job_id = null where is_demo = true`);
-  await db.delete(s.jobs).where(eq(s.jobs.isDemo, true));
-  await db.delete(s.appointments).where(eq(s.appointments.isDemo, true));
-  await db.delete(s.vehicles).where(eq(s.vehicles.isDemo, true));
-  await db.delete(s.customers).where(eq(s.customers.isDemo, true));
-  await db.delete(s.dailyReports).where(eq(s.dailyReports.isDemo, true));
-  await db.delete(s.targets).where(eq(s.targets.isDemo, true));
-  await db.delete(s.capacityProfiles).where(eq(s.capacityProfiles.isDemo, true));
+  await db.delete(s.notifications).where(demoOr(s.notifications.isDemo, s.notifications.dealershipId));
+  await db.delete(s.transactions).where(demoOr(s.transactions.isDemo, s.transactions.dealershipId));
+  await db.delete(s.labourLogs).where(demoOr(s.labourLogs.isDemo, s.labourLogs.dealershipId));
+  await db.update(s.appointments).set({ jobId: null }).where(demoOr(s.appointments.isDemo, s.appointments.dealershipId));
+  await db.delete(s.jobs).where(demoOr(s.jobs.isDemo, s.jobs.dealershipId));
+  await db.delete(s.appointments).where(demoOr(s.appointments.isDemo, s.appointments.dealershipId));
+  const demoCustomers = db.select({ id: s.customers.id }).from(s.customers).where(demoOr(s.customers.isDemo, s.customers.dealershipId));
+  await db.delete(s.vehicles).where(or(eq(s.vehicles.isDemo, true), inArray(s.vehicles.customerId, demoCustomers)));
+  await db.delete(s.customers).where(demoOr(s.customers.isDemo, s.customers.dealershipId));
+  await db.delete(s.dailyReports).where(demoOr(s.dailyReports.isDemo, s.dailyReports.dealershipId));
+  await db.delete(s.targets).where(demoOr(s.targets.isDemo, s.targets.dealershipId));
+  await db.delete(s.capacityProfiles).where(demoOr(s.capacityProfiles.isDemo, s.capacityProfiles.dealershipId));
   await db.delete(s.workflowStages).where(inDealers(s.workflowStages.dealershipId));
   if (demoUsers.length) {
+    // Demo users may have touched non-demo records; keep those records, drop the user link.
+    await db.update(s.jobEvents).set({ userId: null }).where(inArray(s.jobEvents.userId, demoUsers));
+    await db.update(s.jobs).set({ createdById: null }).where(inArray(s.jobs.createdById, demoUsers));
+    await db.update(s.jobs).set({ assignedToId: null }).where(inArray(s.jobs.assignedToId, demoUsers));
+    await db.update(s.transactions).set({ createdById: null }).where(inArray(s.transactions.createdById, demoUsers));
+    await db.update(s.appointments).set({ createdById: null }).where(inArray(s.appointments.createdById, demoUsers));
+    await db.update(s.alerts).set({ ownerId: null }).where(inArray(s.alerts.ownerId, demoUsers));
+    await db.update(s.targets).set({ approvedById: null }).where(inArray(s.targets.approvedById, demoUsers));
+    await db.update(s.dailyReports).set({ submittedById: null }).where(inArray(s.dailyReports.submittedById, demoUsers));
+    await db.update(s.jobPhotos).set({ uploadedById: null }).where(inArray(s.jobPhotos.uploadedById, demoUsers));
+    await db.update(s.labourLogs).set({ technicianId: null }).where(inArray(s.labourLogs.technicianId, demoUsers));
     await db.delete(s.importBatches).where(inArray(s.importBatches.createdById, demoUsers));
     await db.delete(s.auditLog).where(or(inArray(s.auditLog.userId, demoUsers), inDealers(s.auditLog.dealershipId)));
   }
@@ -149,7 +164,7 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
   log("master data");
   const entities = await db
     .insert(s.legalEntities)
-    .values(["A", "B", "C"].map((x) => ({ code: `DEMO-LE-${x}`, name: `Demo Legal Entity ${x} (placeholder)`, isDemo: true })))
+    .values(["A", "B", "C"].map((x) => ({ code: `DEMO-LE-${x}`, name: `Demo Entity ${x}`, isDemo: true })))
     .returning();
   const entityBy = (x: string) => entities.find((e) => e.code === `DEMO-LE-${x}`)!;
   const brandRows = await db.insert(s.brands).values(PROFILES.map((p) => ({ name: p.brand, isDemo: true }))).onConflictDoNothing().returning();
@@ -158,7 +173,7 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
     .insert(s.dealerships)
     .values(PROFILES.map((p) => ({
       code: p.code, name: `Kun ${p.brand}`, brandId: allBrands.find((b) => b.name === p.brand)!.id, legalEntityId: entityBy(p.entity).id,
-      locationName: "Demo location (placeholder)", city: null, hasSales: true, hasService: true, hasBodyShop: p.bodyShop, isDemo: true,
+      locationName: "Location TBC", city: null, hasSales: true, hasService: true, hasBodyShop: p.bodyShop, isDemo: true,
     })))
     .returning();
   const dealerBy = (code: string) => dealers.find((d) => d.code === code)!;
@@ -300,7 +315,8 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
           const apprIdx = stages.findIndex((st) => ["estimate_approval", "approval"].includes(st.commonStage));
           const billingIdx = stages.findIndex((st) => st.commonStage === "billing");
           const readyIdx = stages.findIndex((st) => st.commonStage === "ready");
-          const tech = techs.length ? pick(techs) : null;
+          // Open jobs lean towards technician 1 so each demo technician login has work to show.
+          const tech = techs.length ? (finishAt > pNow && chance(0.5) ? techs[0] : pick(techs)) : null;
           const jobNoKey = `${type}-${p.code}-${day.slice(2, 7).replace("-", "")}`;
           seq[jobNoKey] = (seq[jobNoKey] ?? 0) + 1;
           const id = crypto.randomUUID();

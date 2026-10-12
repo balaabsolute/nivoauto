@@ -9,7 +9,7 @@ import {
   type RevenueCategory,
 } from "@/db/schema";
 import {
-  resolvePeriod, rangeToInstants, eachDay, eachMonth, addDays, businessDate, monthKey, daysInMonth, workingDays, type Period, type DateRange,
+  resolvePeriod, rangeToInstants, periodRangeLabel, eachDay, eachMonth, addDays, businessDate, monthKey, daysInMonth, workingDays, type Period, type DateRange,
 } from "@/domain/periods";
 import { summariseRevenue, CATEGORY_ORDER, type RevenueSummary, type RevenueLine, round2 } from "@/domain/revenue";
 import {
@@ -436,7 +436,7 @@ function signalsFor(d: DealerInfo, m: UnitMetrics, raw: Raw, period: Period, asO
     dealershipId: d.id,
     dealershipName: d.name,
     periodKey: alertPeriodKey(period),
-    periodLabel: period.label,
+    periodLabel: period.key === "custom" ? periodRangeLabel(period) : period.label,
     revenuePrev: m.revenuePrev.lineCount ? m.revenuePrev.total : null,
     // Alerts compare against the target for completed days only, so a part-day never triggers "below target".
     proRataRevenueTarget: completedTarget(raw, d.id, period, today),

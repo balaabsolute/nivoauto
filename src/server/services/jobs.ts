@@ -68,13 +68,19 @@ async function bumpVersion(tx: DB, jobId: string, expectedVersion: number | unde
   return res[0];
 }
 
+/** Next job number for a dealership/type/month: highest existing sequence + 1 (gaps are fine). */
 async function nextJobNo(db: DB, dealerCode: string, jobType: JobType): Promise<string> {
   const prefix = `${jobType === "service" ? "SVC" : "BSH"}-${dealerCode}-${businessDate().slice(2, 7).replace("-", "")}-`;
   const [{ n }] = await db
-    .select({ n: sql<number>`count(*)::int` })
+    .select({ n: sql<number>`coalesce(max(nullif(regexp_replace(substring(${jobs.jobNo} from ${prefix.length + 1}::int), '[^0-9]', '', 'g'), '')::int), 0)` })
     .from(jobs)
     .where(sql`${jobs.jobNo} like ${prefix + "%"}`);
-  return `${prefix}${String(n + 1).padStart(4, "0")}`;
+  return `${prefix}${String(Number(n) + 1).padStart(4, "0")}`;
+}
+
+function isUniqueViolation(e: unknown, constraint: string): boolean {
+  const c = (e as { cause?: { code?: string; constraint?: string; detail?: string } })?.cause ?? (e as { code?: string; detail?: string });
+  return c?.code === "23505" && (`${(c as { constraint?: string }).constraint ?? ""}${c.detail ?? ""}`.includes(constraint));
 }
 
 function contextFor(job: typeof jobs.$inferSelect, reg: string) {
@@ -112,7 +118,8 @@ export type CustomerVehicleInput = z.infer<typeof customerVehicleInput>;
  * Re-uses an existing vehicle (by normalised registration) or customer (by phone) within the same
  * legal entity, so repeat visits do not create duplicates.
  */
-export async function findOrCreateCustomerVehicle(tx: DB, actor: Actor, dealership: typeof dealerships.$inferSelect, input: CustomerVehicleInput, isDemo = false) {
+export async function findOrCreateCustomerVehicle(tx: DB, actor: Actor, dealership: typeof dealerships.$inferSelect, input: CustomerVehicleInput, isDemoIn?: boolean) {
+  const isDemo = isDemoIn ?? dealership.isDemo; // records at a demo dealership are demo records
   const reg = normaliseReg(input.registrationNo);
   const phone = normalisePhone(input.phone);
   const [existingVehicle] = await tx
@@ -183,9 +190,23 @@ export async function createJob(db: DB, actor: Actor, raw: CreateJobInput, opts:
 
   const stages = await getStages(db, dealer.id, input.jobType);
   if (!stages.length) throw new ValidationError(["No workflow stages configured"]);
+  opts = { ...opts, isDemo: opts.isDemo ?? dealer.isDemo };
   const first = stages[0];
 
-  const result = await db.transaction(async (txRaw) => {
+  // Retry if two people open a job card at the same moment and get the same job number.
+  let result: { job: typeof jobs.$inferSelect; vehicle: typeof vehicles.$inferSelect } | undefined;
+  for (let attempt = 0; attempt < 5 && !result; attempt++) {
+    try {
+      result = await createJobTx();
+    } catch (e) {
+      if (!isUniqueViolation(e, "job_no") || attempt === 4) throw e;
+    }
+  }
+  if (!result) throw new ConflictError("Could not allocate a job number; try again");
+  const created = result;
+
+  async function createJobTx() {
+   return db.transaction(async (txRaw) => {
     const tx = txRaw as unknown as DB;
     const { customer, vehicle } = await findOrCreateCustomerVehicle(tx, actor, dealer, input, opts.isDemo);
 
@@ -227,19 +248,20 @@ export async function createJob(db: DB, actor: Actor, raw: CreateJobInput, opts:
     await tx.insert(jobEvents).values({ jobId: job.id, type: "created", toValue: first.code, userId: actor.id, at: openedAt });
     await audit(tx, { userId: actor.id, action: "job.create", entityType: "job", entityId: job.id, dealershipId: dealer.id, after: { jobNo, jobType: job.jobType, stage: first.code } });
     return { job, vehicle };
-  });
+   });
+  }
 
   await fireAll(db, [
     {
       event: "vehicle_received",
       dealershipId: dealer.id,
-      customerId: result.job.customerId,
-      jobId: result.job.id,
-      context: contextFor(result.job, result.vehicle.registrationNo),
+      customerId: created.job.customerId,
+      jobId: created.job.id,
+      context: contextFor(created.job, created.vehicle.registrationNo),
       isDemo: opts.isDemo,
     },
   ]);
-  return result.job;
+  return created.job;
 }
 
 /* ───────────────────────── Stage transitions ───────────────────────── */

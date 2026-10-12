@@ -50,6 +50,7 @@ export async function saveDailyReport(db: DB, actor: Actor, raw: z.input<typeof 
     availableBayHoursOverride: input.availableBayHoursOverride ?? null,
     notes: input.notes ?? null,
     status: input.submit ? ("submitted" as const) : (before?.status ?? ("draft" as const)),
+    isDemo: (await db.select({ d: dealerships.isDemo }).from(dealerships).where(eq(dealerships.id, input.dealershipId)))[0]?.d ?? false,
     submittedById: input.submit ? actor.id : before?.submittedById ?? null,
     submittedAt: input.submit ? new Date() : before?.submittedAt ?? null,
     updatedAt: new Date(),

@@ -49,6 +49,7 @@ export async function createManualTransaction(db: DB, actor: Actor, input: Manua
       sourceRef,
       notes: input.notes ?? null,
       createdById: actor.id,
+      isDemo: dealer.isDemo,
     })
     .onConflictDoNothing()
     .returning();
@@ -154,7 +155,7 @@ export async function importTransactionsCsv(db: DB, actor: Actor, fileName: stri
       businessDate: n.businessDate, dealershipId: dealer!.id, legalEntityId: dealer!.legalEntityId, brandId: dealer!.brandId,
       category: n.category, kind: n.kind, partsChannel: n.partsChannel ?? null, revenueAmount: n.revenueAmount, taxAmount: n.taxAmount ?? null,
       directCostAmount: n.directCostAmount ?? null, units: n.units ?? null, invoiceRef: n.invoiceRef ?? null,
-      source: "import", sourceRef, createdById: actor.id,
+      source: "import", sourceRef, createdById: actor.id, isDemo: dealer!.isDemo,
     });
     results.push({ row: rowNo, status: "accepted" });
   });
@@ -222,6 +223,7 @@ export async function upsertTarget(db: DB, actor: Actor, input: { dealershipId: 
     deliveriesTarget: input.deliveriesTarget,
     approvedById: input.approve ? actor.id : null,
     approvedAt: input.approve ? new Date() : null,
+    isDemo: (await db.select({ d: dealerships.isDemo }).from(dealerships).where(eq(dealerships.id, input.dealershipId)))[0]?.d ?? false,
   };
   const [row] = await db.insert(targets).values(values).onConflictDoUpdate({ target: [targets.dealershipId, targets.month], set: values }).returning();
   await audit(db, { userId: actor.id, action: "target.upsert", entityType: "target", entityId: row.id, dealershipId: input.dealershipId, before: before ?? null, after: row });
