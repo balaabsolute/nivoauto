@@ -2,7 +2,7 @@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { formatInrCompact, formatInr } from "@/domain/format";
 
-export interface TrendPoint { label: string; key: string; current: number | null; comparison: number | null; target: number | null }
+export interface TrendPoint { label: string; cmpLabel?: string; key: string; current: number | null; comparison: number | null; target: number | null }
 
 const C = { current: "#2a78d6", comparison: "#8a959e", target: "#14212b" };
 
@@ -21,7 +21,7 @@ export function TrendChart({ data, comparisonLabel, granularity }: { data: Trend
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
             <CartesianGrid vertical={false} stroke="#e6eaed" />
-            <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#b8c2c9" }} tick={{ fontSize: 11, fill: "#4a5a68" }} interval="preserveStartEnd" minTickGap={14} />
+            <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#b8c2c9" }} tick={{ fontSize: 11, fill: "#4a5a68" }} interval="preserveStartEnd" minTickGap={24} />
             <YAxis tickFormatter={(v) => formatInrCompact(v)} tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: "#4a5a68" }} width={64} />
             <Tooltip
               cursor={{ stroke: "#b8c2c9", strokeWidth: 1 }}
@@ -30,9 +30,9 @@ export function TrendChart({ data, comparisonLabel, granularity }: { data: Trend
                 const p = payload[0].payload as TrendPoint;
                 return (
                   <div className="rounded border border-line bg-panel px-3 py-2 text-xs shadow-sm">
-                    <p className="font-medium mb-1">{granularity === "day" ? `Day ${label}` : label}</p>
+                    <p className="font-medium mb-1">{granularity === "day" ? `Up to ${label}` : `Up to end of ${label}`}</p>
                     <p>This period: <span className="num font-medium">{formatInr(p.current)}</span></p>
-                    {p.comparison != null && <p className="text-ink-2">Comparison: <span className="num">{formatInr(p.comparison)}</span></p>}
+                    {p.comparison != null && <p className="text-ink-2">Comparison{p.cmpLabel ? ` (to ${p.cmpLabel})` : ""}: <span className="num">{formatInr(p.comparison)}</span></p>}
                     {p.target != null && <p className="text-ink-2">Target: <span className="num">{formatInr(p.target)}</span></p>}
                   </div>
                 );

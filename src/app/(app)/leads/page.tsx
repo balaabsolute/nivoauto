@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import clsx from "clsx";
 import { getDb } from "@/db/client";
@@ -16,6 +18,7 @@ export const metadata = { title: "Car enquiries" };
 
 export default async function LeadsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("leads.view");
+  const dc = await dealerColors();
   const sp = await searchParams;
   const db = await getDb();
   const view = first(sp.view) === "followups" ? "followups" : "list";
@@ -96,7 +99,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
                     <tr key={r.l.id} className="border-b border-line last:border-0 hover:bg-page/60">
                       <td className="td">
                         <Link href={`/leads/${r.l.id}`} className="font-medium text-petrol hover:underline">{r.customerName}</Link>
-                        <div className="text-xs text-ink-3">{r.l.leadNo}{dealers.length > 1 ? ` · ${r.dealershipName}` : ""}</div>
+                        <div className="text-xs text-ink-3">{r.l.leadNo}{dealers.length > 1 && <> · <DealerName name={r.dealershipName} color={dc.of(r.dealershipName)} size="sm" /></>}</div>
                       </td>
                       <td className="td">{r.models.join(", ") || "—"}{r.testDrive && <div className="text-xs text-ink-3">Test drive {r.testDrive}</div>}</td>
                       <td className="td">{r.l.status === "open" ? <Chip tone="petrol">{STAGE_LABELS[r.l.stage]}</Chip> : <Chip tone={r.l.status === "won" ? "good" : "neutral"}>{STATUS_LABELS[r.l.status]}</Chip>}</td>

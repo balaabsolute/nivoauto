@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Icon } from "./Icon";
-import type { NavItem } from "./nav";
+import { NAV_GROUPS, type NavItem } from "./nav";
 
 function isActive(pathname: string, item: NavItem, all: NavItem[]) {
   const prefix = item.match ?? item.href;
@@ -18,25 +18,34 @@ export function Shell({ nav, user, children, banner }: { nav: NavItem[]; user: {
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [pathname]);
 
+  const groups = NAV_GROUPS.map((g) => ({ g, items: nav.filter((n) => n.group === g) })).filter((x) => x.items.length);
   const links = (
-    <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
-      {nav.map((n) => {
-        const active = isActive(pathname, n, nav);
-        return (
-          <Link
-            key={n.href}
-            href={n.href}
-            aria-current={active ? "page" : undefined}
-            className={clsx(
-              "flex items-center gap-3 rounded px-3 py-2 text-sm",
-              active ? "bg-white/10 text-white font-medium" : "text-white/70 hover:text-white hover:bg-white/5",
-            )}
-          >
-            <Icon name={n.icon} className="h-[18px] w-[18px] shrink-0" />
-            {n.label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Main" className="flex-1 overflow-y-auto px-2 py-3 space-y-4">
+      {groups.map(({ g, items }) => (
+        <div key={g}>
+          {groups.length > 1 && <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-white/45">{g}</p>}
+          <ul className="space-y-0.5">
+            {items.map((n) => {
+              const active = isActive(pathname, n, nav);
+              return (
+                <li key={n.href}>
+                  <Link
+                    href={n.href}
+                    aria-current={active ? "page" : undefined}
+                    className={clsx(
+                      "flex items-center gap-3 rounded px-3 py-1.5 text-sm",
+                      active ? "bg-white/10 text-white font-medium" : "text-white/70 hover:text-white hover:bg-white/5",
+                    )}
+                  >
+                    <Icon name={n.icon} className="h-[18px] w-[18px] shrink-0" />
+                    {n.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
     </nav>
   );
 
@@ -97,7 +106,12 @@ export function Shell({ nav, user, children, banner }: { nav: NavItem[]; user: {
             </aside>
           </div>
         )}
-        <main id="main" className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1440px]">{children}</main>
+        <div className="flex-1 min-w-0 flex flex-col min-h-screen lg:min-h-[calc(100vh-var(--banner-h,0px))]">
+          <main id="main" className="flex-1 min-w-0 px-4 sm:px-6 lg:px-8 py-5 sm:py-6 max-w-[1440px] w-full">{children}</main>
+          <footer className="px-4 sm:px-6 lg:px-8 py-4 max-w-[1440px] w-full flex justify-end text-xs text-ink-3 no-print">
+            <p>Concept and Developed by <a href="https://idataone.com" target="_blank" rel="noopener" className="font-medium text-petrol hover:underline">iDataOne</a></p>
+          </footer>
+        </div>
       </div>
     </div>
   );

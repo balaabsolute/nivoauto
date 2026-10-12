@@ -45,14 +45,14 @@ export async function salesPerformance(db: DB, actor: Actor, period: Period, dea
     db.select({ publishedAt: modelUpdates.publishedAt, dealershipId: modelUpdates.dealershipId }).from(modelUpdates).where(and(demoFilter(modelUpdates.isDemo), isNotNull(modelUpdates.publishedAt), gte(modelUpdates.publishedAt, cmp.from))),
   ]);
   const consultants = await db
-    .selectDistinct({ id: users.id, name: users.name })
+    .selectDistinct({ id: users.id, name: users.name, dealershipId: userDealerships.dealershipId })
     .from(users)
     .innerJoin(userDealerships, eq(userDealerships.userId, users.id))
     .where(and(inArray(users.role, ["sales_consultant", "dealership_manager"]), ids === "all" ? undefined : ids.length ? inArray(userDealerships.dealershipId, ids) : sql`false`));
   const k = salesKpis(
     {
       leads: rows.map(({ l, c }) => ({
-        id: l.id, createdAt: l.createdAt, closedAt: l.closedAt, status: l.status, source: l.source, consultantId: l.consultantId, timeframe: l.timeframe, lostToBrand: l.lostToBrand,
+        id: l.id, dealershipId: l.dealershipId, createdAt: l.createdAt, closedAt: l.closedAt, status: l.status, source: l.source, consultantId: l.consultantId, timeframe: l.timeframe, lostToBrand: l.lostToBrand,
         nurtureEligible: nurtureBlocker(l.status, c) == null,
       })),
       drives,
@@ -61,7 +61,8 @@ export async function salesPerformance(db: DB, actor: Actor, period: Period, dea
       updatesPublished: ups.filter((u) => ids === "all" || !u.dealershipId || ids.includes(u.dealershipId)).map((u) => ({ publishedAt: u.publishedAt! })),
       activities: acts,
       interests: ints,
-      consultants,
+      // One row per consultant: their first dealership in scope.
+      consultants: [...new Map(consultants.map((c) => [c.id, c])).values()],
     },
     r,
     cmp,

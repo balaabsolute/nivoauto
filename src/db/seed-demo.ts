@@ -20,6 +20,7 @@ import { hashPassword } from "@/server/password";
 import { renderTemplate } from "@/domain/notifications";
 import { SERVICE_CHECKLIST, BODYSHOP_CHECKLIST } from "@/server/services/jobs";
 import { seedCrmDemo } from "./seed-crm";
+import { DEALER_PALETTE } from "@/domain/dealer-colors";
 
 export { DEMO_PASSWORD } from "./demo-constants";
 import { DEMO_PASSWORD } from "./demo-constants";
@@ -87,6 +88,16 @@ const PARTS = ["Oil filter", "Brake pads (front)", "Air filter", "Cabin filter",
 const INSURERS = ["Demo Insurer 1", "Demo Insurer 2", "Demo Insurer 3"];
 
 /* ───────────── guards & reset ───────────── */
+
+/** Fictitious demo staff names (not Kun employees). Customers stay suffixed "(demo)". */
+const STAFF_NAMES: Record<string, { manager: string; sales: string[] }> = {
+  HON: { manager: "Suresh Babu", sales: ["Arun Prakash", "Divya Raman"] },
+  HYU: { manager: "Ramesh Chandran", sales: ["Karthik Sundar", "Meera Iyer"] },
+  BMW: { manager: "Nikhil Varma", sales: ["Vikram Rao", "Ananya Menon"] },
+  RR: { manager: "Aditya Shetty", sales: ["Rohan Kapoor"] },
+  VW: { manager: "Gopal Iyer", sales: ["Sanjay Nair", "Priya Krishnan"] },
+  BYD: { manager: "Kavitha Srinivasan", sales: ["Harish Kumar", "Lakshmi Venkat"] },
+};
 
 export function assertDemoAllowed() {
   if (process.env.DATA_MODE === "live") throw new Error("Refusing to seed demo data: DATA_MODE=live");
@@ -191,7 +202,8 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
   const allBrands = brandRows.length === PROFILES.length ? brandRows : await db.select().from(s.brands);
   const dealers = await db
     .insert(s.dealerships)
-    .values(PROFILES.map((p) => ({
+    .values(PROFILES.map((p, i) => ({
+      color: DEALER_PALETTE[i % DEALER_PALETTE.length].hex,
       code: p.code, name: `Kun ${p.brand} (demo)`, brandId: allBrands.find((b) => b.name === p.brand)!.id, legalEntityId: entityBy(p.entity).id,
       locationName: "Location TBC", city: null, hasSales: true, hasService: true, hasBodyShop: p.bodyShop, isDemo: true,
     })))
@@ -217,12 +229,12 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
   ];
   for (const p of PROFILES) {
     const c = p.code.toLowerCase();
-    userRows.push(mkUser(`manager.${c}@demo.kun.local`, `Demo Manager — ${p.brand}`, "dealership_manager"));
+    userRows.push(mkUser(`manager.${c}@demo.kun.local`, STAFF_NAMES[p.code]?.manager ?? `Demo Manager — ${p.brand}`, "dealership_manager"));
     userRows.push(mkUser(`advisor.${c}@demo.kun.local`, `Demo Advisor — ${p.brand}`, "service_advisor"));
     const techs = p.serviceJobsPerDay > 5 ? 3 : 2;
     for (let i = 1; i <= techs; i++) userRows.push(mkUser(`tech${i}.${c}@demo.kun.local`, `Demo Technician ${i} — ${p.brand}`, "technician"));
     const sales = p.code === "RR" ? 1 : 2;
-    for (let i = 1; i <= sales; i++) userRows.push(mkUser(`sales${i}.${c}@demo.kun.local`, `Demo Sales Consultant ${i} — ${p.brand}`, "sales_consultant"));
+    for (let i = 1; i <= sales; i++) userRows.push(mkUser(`sales${i}.${c}@demo.kun.local`, STAFF_NAMES[p.code]?.sales[i - 1] ?? `Demo Sales Consultant ${i} — ${p.brand}`, "sales_consultant"));
     userRows.push(mkUser(`kiosk.${c}@demo.kun.local`, `Demo Kiosk — ${p.brand} showroom`, "kiosk"));
   }
   const users = await db.insert(s.users).values(userRows).returning();

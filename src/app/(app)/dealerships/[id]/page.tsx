@@ -9,7 +9,7 @@ import { businessDate, periodRangeLabel } from "@/domain/periods";
 import { can, canAccessDealership, isGroupWide } from "@/domain/permissions";
 import { formatInr, formatInrCompact, formatInt, formatPct, formatDateTime, formatHours } from "@/domain/format";
 import { COMMON_STAGE_LABELS, type CommonStage } from "@/domain/workflow";
-import { PageHeader, Panel, Chip, EmptyState, ProgressBar } from "@/components/ui";
+import { PageHeader, Panel, Chip, EmptyState, ProgressBar, DealerName } from "@/components/ui";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import {
@@ -42,7 +42,7 @@ export default async function DealershipPage({ params, searchParams }: { params:
     <>
       <PageHeader
         back={isGroupWide(actor) ? { href: `/group?${periodQuery(period)}`, label: "Overview" } : undefined}
-        title={dealer.name}
+        title={<DealerName name={dealer.name} color={dealer.color} />}
         subtitle={
           <>
             {dealer.brand} · {dealer.legalEntity} · {dealer.location}
@@ -69,18 +69,14 @@ export default async function DealershipPage({ params, searchParams }: { params:
 
         <InsightsPanel alerts={row.alerts} showDealer={false} grid limit={9} />
 
-        <div className={`grid gap-4 lg:grid-cols-2 ${dealer.hasSales ? "" : "xl:grid-cols-2"}`}>
+        <div className="grid gap-4 lg:grid-cols-2">
           <OperationalHealthPanel m={m} hasBodyShop={dealer.hasBodyShop} />
-          {dealer.hasSales && (
-            <div className="space-y-4">
-              <PipelinePanel m={m} />
-              <ShowroomPanel m={m} href={`/leads/performance?dealer=${id}&${periodQuery(period)}`} />
-            </div>
-          )}
+          <StageQueue wip={m.serviceWip} stages={SERVICE_COMMON_STAGES} title="Service stage queue" subtitle="Open jobs by stage now" href={`/jobs?dealer=${id}`} />
+          {dealer.hasSales && <ShowroomPanel m={m} href={`/leads/performance?dealer=${id}&${periodQuery(period)}`} />}
+          {dealer.hasSales && <PipelinePanel m={m} />}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          <StageQueue wip={m.serviceWip} stages={SERVICE_COMMON_STAGES} title="Service stage queue" subtitle="Open jobs by stage now" href={`/jobs?dealer=${id}`} />
+        <div className="grid gap-4 lg:grid-cols-2">
           <Panel title="Spare parts" subtitle="Sales and workshop dependency">
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
               {showFin && <div><dt className="text-xs text-ink-2">Retail parts revenue</dt><dd className="text-lg font-semibold num">{formatInrCompact(m.parts.retail)}</dd></div>}

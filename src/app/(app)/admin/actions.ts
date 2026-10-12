@@ -35,6 +35,7 @@ export async function saveDealershipAction(_p: R, f: FormData) {
   const res = await run(async () => saveDealership(await getDb(), await actorForAction("admin.master_data"), {
     id: v(f, "id") ?? undefined, code: v(f, "code") ?? "", name: v(f, "name") ?? "", brandId: v(f, "brandId") ?? "", legalEntityId: v(f, "legalEntityId") ?? "",
     locationName: v(f, "locationName") ?? "", city: v(f, "city"), hasSales: f.get("hasSales") === "on", hasService: f.get("hasService") === "on", hasBodyShop: f.get("hasBodyShop") === "on", active: f.get("active") === "on",
+    color: v(f, "color"),
   }), "Dealership saved");
   return res;
 }

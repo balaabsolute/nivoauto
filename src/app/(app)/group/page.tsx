@@ -58,15 +58,13 @@ export default async function GroupPage({ searchParams }: { searchParams: Promis
             <DealerTable rows={toTableRows(d.dealers)} query={q} />
           </Panel>
 
-          <InsightsPanel alerts={d.alerts} grid limit={9} />
+          <InsightsPanel alerts={d.alerts} grid limit={9} colors={Object.fromEntries(d.dealers.map((x) => [x.dealer.name, x.dealer.color]))} />
 
-          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             <OperationalHealthPanel m={d.total} />
-            <div className="space-y-4">
-              <ShowroomPanel m={d.total} href={`/leads/performance?${q}`} />
-              <PipelinePanel m={d.total} />
-            </div>
             <StageQueue wip={d.total.bodyshopWip} stages={BODYSHOP_COMMON_STAGES} title="Body shop stage queue" subtitle="Vehicles in each stage now" href="/bodyshop" />
+            <ShowroomPanel m={d.total} href={`/leads/performance?${q}`} />
+            <PipelinePanel m={d.total} />
           </div>
         </div>
       )}

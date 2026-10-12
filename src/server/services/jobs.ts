@@ -10,7 +10,7 @@ import {
 } from "@/domain/workflow";
 import { assertCan, assertDealership, can, canMoveJob, canViewJob, ForbiddenError, dealershipScope } from "@/domain/permissions";
 import { isCustomerFacingDelay } from "@/domain/notifications";
-import { businessDate, addDays } from "@/domain/periods";
+import { businessDate, addDays, zonedMidnight } from "@/domain/periods";
 
 const LABOUR_BACKDATE_DAYS = 7;
 import type { Actor } from "../principal";
@@ -574,6 +574,47 @@ export async function listJobs(db: DB, actor: Actor, f: JobListFilters = {}) {
     .orderBy(asc(sql`coalesce(${jobs.promisedAt}, ${jobs.expectedCompletionAt}, ${jobs.openedAt} + interval '30 days')`), desc(jobs.openedAt))
     .limit(500);
   return rows;
+}
+
+/** Headline figures for the jobs list (independent of the list's status/search filters). */
+export async function jobSummary(db: DB, actor: Actor, f: { jobType?: "service" | "bodyshop"; dealershipId?: string; mine?: boolean } = {}) {
+  assertCan(actor, "jobs.view");
+  const conds: (SQL | undefined)[] = [demoFilter(jobs.isDemo)];
+  const scope = dealershipScope(actor);
+  if (scope !== "all") conds.push(scope.length ? inArray(jobs.dealershipId, scope) : sql`false`);
+  if (actor.role === "technician" || f.mine) conds.push(eq(jobs.assignedToId, actor.id));
+  if (f.jobType) conds.push(eq(jobs.jobType, f.jobType));
+  if (f.dealershipId) conds.push(eq(jobs.dealershipId, f.dealershipId));
+  const today = businessDate();
+  const dayStart = zonedMidnight(today);
+  const dayEnd = zonedMidnight(addDays(today, 1));
+  const monthStart = zonedMidnight(`${today.slice(0, 7)}-01`);
+  const due = sql`coalesce(${jobs.promisedAt}, ${jobs.expectedCompletionAt})`;
+  const open = sql`${jobs.status} = 'open'`;
+  const [r] = await db
+    .select({
+      open: sql<number>`count(*) filter (where ${open})`,
+      overdue: sql<number>`count(*) filter (where ${open} and ${due} < now())`,
+      dueToday: sql<number>`count(*) filter (where ${open} and ${due} >= now() and ${due} < ${dayEnd})`,
+      awaitingApproval: sql<number>`count(*) filter (where ${open} and ${jobs.approvalStatus} = 'pending')`,
+      waitingParts: sql<number>`count(*) filter (where ${open} and ${jobs.blocker} = 'parts')`,
+      blocked: sql<number>`count(*) filter (where ${open} and ${jobs.blocker} <> 'none')`,
+      openedToday: sql<number>`count(*) filter (where ${jobs.openedAt} >= ${dayStart} and ${jobs.openedAt} < ${dayEnd})`,
+      deliveredToday: sql<number>`count(*) filter (where ${jobs.deliveredAt} >= ${dayStart} and ${jobs.deliveredAt} < ${dayEnd})`,
+      deliveredMtd: sql<number>`count(*) filter (where ${jobs.deliveredAt} >= ${monthStart})`,
+      onTimeMtd: sql<number>`count(*) filter (where ${jobs.deliveredAt} >= ${monthStart} and ${jobs.promisedAt} is not null and ${jobs.deliveredAt} <= ${jobs.promisedAt})`,
+      withPromiseMtd: sql<number>`count(*) filter (where ${jobs.deliveredAt} >= ${monthStart} and ${jobs.promisedAt} is not null)`,
+      avgTatHoursMtd: sql<number | null>`avg(extract(epoch from (${jobs.deliveredAt} - ${jobs.openedAt})) / 3600) filter (where ${jobs.deliveredAt} >= ${monthStart})`,
+    })
+    .from(jobs)
+    .where(and(...conds));
+  const n = (x: unknown) => Number(x ?? 0);
+  return {
+    open: n(r.open), overdue: n(r.overdue), dueToday: n(r.dueToday), awaitingApproval: n(r.awaitingApproval), waitingParts: n(r.waitingParts), blocked: n(r.blocked),
+    openedToday: n(r.openedToday), deliveredToday: n(r.deliveredToday), deliveredMtd: n(r.deliveredMtd),
+    onTimePctMtd: n(r.withPromiseMtd) ? Math.round((n(r.onTimeMtd) / n(r.withPromiseMtd)) * 1000) / 10 : null,
+    avgTatHoursMtd: r.avgTatHoursMtd == null ? null : Math.round(Number(r.avgTatHoursMtd) * 10) / 10,
+  };
 }
 
 export async function getJobDetail(db: DB, actor: Actor, jobId: string) {

@@ -22,7 +22,7 @@ Source of truth: `src/db/schema.ts` (Drizzle, PostgreSQL). Migrations: `./drizzl
 
 | Table | Purpose |
 |---|---|
-| `legal_entities`, `brands`, `dealerships` | Master data |
+| `legal_entities`, `brands`, `dealerships` | Master data. Each dealership has an identity colour (`color`, chosen under Administration) used wherever it is named |
 | `users`, `user_dealerships`, `sessions` | Accounts, dealership scope for location-bound roles, hashed session tokens |
 | `customers`, `vehicles` | Customer (per legal entity) with channel consent + timestamp, separate marketing consent and marketing opt-out; vehicles by normalised registration |
 | `workflow_stages` | Stage configuration: group default (`dealership_id` NULL) or per location; each stage maps to a **common stage** |

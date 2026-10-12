@@ -25,6 +25,8 @@ import { demoFilter, DATA_MODE } from "./data-mode";
 
 export const STALE_AFTER_HOURS = Number(process.env.STALE_AFTER_HOURS ?? 36);
 
+import { dealerColor } from "@/domain/dealer-colors";
+
 export interface DealerInfo {
   id: string;
   code: string;
@@ -38,6 +40,7 @@ export interface DealerInfo {
   hasService: boolean;
   hasBodyShop: boolean;
   isDemo: boolean;
+  color: string;
 }
 
 export interface Freshness {
@@ -102,6 +105,7 @@ export interface DealerRow extends UnitMetrics {
 
 export interface TrendPoint {
   label: string;
+  cmpLabel?: string;
   key: string;
   current: number | null;
   comparison: number | null;
@@ -145,7 +149,7 @@ export async function loadDealers(db: DB, ids: "all" | string[]): Promise<Dealer
     .orderBy(dealerships.name);
   return rows.map(({ d, brand, le, leCode }) => ({
     id: d.id, code: d.code, name: d.name, brand, legalEntity: le, legalEntityCode: leCode, location: d.locationName, city: d.city,
-    hasSales: d.hasSales, hasService: d.hasService, hasBodyShop: d.hasBodyShop, isDemo: d.isDemo,
+    hasSales: d.hasSales, hasService: d.hasService, hasBodyShop: d.hasBodyShop, isDemo: d.isDemo, color: dealerColor(d),
   }));
 }
 
@@ -380,6 +384,10 @@ function maxDate(ds: (Date | null | undefined)[]): Date | null {
   return v.length ? new Date(Math.max(...v.map((d) => d.getTime()))) : null;
 }
 
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const dayLabel = (d: string) => `${Number(d.slice(8))} ${MON[Number(d.slice(5, 7)) - 1]}`;
+const monthLabel = (m: string) => `${MON[Number(m.slice(5, 7)) - 1]} ’${m.slice(2, 4)}`;
+
 /** Cumulative revenue trend for the period vs comparison vs pro-rata approved target. */
 function computeTrend(raw: Raw, dealerIds: string[], tp: Period, today: string): TrendPoint[] {
   const set = new Set(dealerIds);
@@ -404,7 +412,7 @@ function computeTrend(raw: Raw, dealerIds: string[], tp: Period, today: string):
       tcum += dailyTarget(d);
       const cd = cdays[i];
       if (cd) ccum += sumBetween(cd, cd);
-      points.push({ key: d, label: `${Number(d.slice(8))}`, current: d <= today ? round2(cum) : null, comparison: cd ? round2(ccum) : null, target: allHaveTargets ? round2(tcum) : null });
+      points.push({ key: d, label: dayLabel(d), cmpLabel: cd ? dayLabel(cd) : undefined, current: d <= today ? round2(cum) : null, comparison: cd ? round2(ccum) : null, target: allHaveTargets ? round2(tcum) : null });
     });
   } else {
     const months = eachMonth(tp);
@@ -424,7 +432,7 @@ function computeTrend(raw: Raw, dealerIds: string[], tp: Period, today: string):
         const cme = `${cm}-${String(daysInMonth(cy, cmm)).padStart(2, "0")}`;
         ccum += sumBetween(cs, cme > tp.comparison.end ? tp.comparison.end : cme);
       }
-      points.push({ key: m, label: new Date(`${m}-01T00:00:00Z`).toLocaleString("en-IN", { month: "short", timeZone: "UTC" }), current: round2(cum), comparison: cm ? round2(ccum) : null, target: allHaveTargets ? round2(tcum) : null });
+      points.push({ key: m, label: monthLabel(m), cmpLabel: cm ? monthLabel(cm) : undefined, current: round2(cum), comparison: cm ? round2(ccum) : null, target: allHaveTargets ? round2(tcum) : null });
     });
   }
   return points;

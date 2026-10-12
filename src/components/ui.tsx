@@ -144,3 +144,13 @@ export function ProgressBar({ value, max = 100, tone = "petrol", label }: { valu
 export function DateText({ d }: { d: Date | string | null }) {
   return <>{formatDate(d)}</>;
 }
+
+/** A dealership's name with its identity colour (colour never stands alone). */
+export function DealerName({ name, color, className, size = "md" }: { name: string; color: string; className?: string; size?: "sm" | "md" }) {
+  return (
+    <span className={clsx("inline-flex items-center gap-1.5 min-w-0", className)}>
+      <span className={clsx("shrink-0 rounded-full", size === "sm" ? "h-2 w-2" : "h-2.5 w-2.5")} style={{ background: color }} aria-hidden />
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}

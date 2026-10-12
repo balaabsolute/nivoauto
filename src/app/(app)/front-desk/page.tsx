@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import clsx from "clsx";
 import { getDb } from "@/db/client";
@@ -19,6 +21,7 @@ const TYPE_TONE = { new_car: "petrol", service: "info", spare_parts: "neutral", 
 
 export default async function FrontDeskPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("frontdesk.view");
+  const dc = await dealerColors();
   const sp = await searchParams;
   const today = businessDate();
   const day = isIsoDate(first(sp.date)) ? first(sp.date)! : today;
@@ -52,7 +55,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
       {dealers.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4 text-[13px]">
           <Link href={`/front-desk?date=${day}`} className={`chip ${!dealerId ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>All</Link>
-          {dealers.map((d) => <Link key={d.id} href={`/front-desk?date=${day}&dealer=${d.id}`} className={`chip ${dealerId === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>{d.name}</Link>)}
+          {dealers.map((d) => <Link key={d.id} href={`/front-desk?date=${day}&dealer=${d.id}`} className={`chip ${dealerId === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}><DealerName name={d.name} color={dc.of(d.id)} size="sm" /></Link>)}
         </div>
       )}
       <div className="grid gap-4 xl:grid-cols-3">
@@ -77,7 +80,7 @@ export default async function FrontDeskPage({ searchParams }: { searchParams: Pr
                           </div>
                           <p className="text-sm text-ink-2 mt-1">{[r.w.registrationNo, r.w.vehicleModel, r.w.request].filter(Boolean).join(" · ") || (r.w.visitType === "new_car" ? "New-car enquiry" : "")}{r.w.insuranceClaim ? " · insurance claim" : ""}</p>
                           <p className="text-xs text-ink-3 mt-0.5">
-                            {r.w.capturedVia === "kiosk" ? "Kiosk" : "Front desk"}{dealers.length > 1 ? ` · ${r.dealershipName}` : ""}{r.attendedBy ? ` · ${r.attendedBy}` : ""}
+                            {r.w.capturedVia === "kiosk" ? "Kiosk" : "Front desk"}{dealers.length > 1 && <> · <DealerName name={r.dealershipName} color={dc.of(r.dealershipName)} size="sm" /></>}{r.attendedBy ? ` · ${r.attendedBy}` : ""}
                             {r.leadNo && <> · <Link href={`/leads/${r.w.leadId}`} className="text-petrol hover:underline">{r.leadNo}</Link></>}
                             {r.jobNo && <> · <Link href={`/jobs/${r.w.jobId}`} className="text-petrol hover:underline">{r.jobNo}</Link></>}
                             {r.w.outcomeNote && <> · {r.w.outcomeNote}</>}

@@ -15,6 +15,7 @@ export interface KLead {
   timeframe: Timeframe | null;
   lostToBrand: string | null;
   nurtureEligible: boolean; // open + consent today (snapshot)
+  dealershipId?: string;
 }
 export interface KDrive { leadId: string; completedAt: Date | null; status: string }
 export interface KFollowUp { leadId: string; dueAt: Date; status: "open" | "done" | "skipped"; completedAt: Date | null; assignedToId: string | null; fromUpdate: boolean }
@@ -30,7 +31,7 @@ export interface SalesInput {
   updatesPublished: { publishedAt: Date }[];
   activities: KActivity[];
   interests: KInterest[];
-  consultants: { id: string; name: string }[];
+  consultants: { id: string; name: string; dealershipId?: string | null }[];
 }
 type Range = { from: Date; to: Date };
 
@@ -103,15 +104,16 @@ export function salesKpis(input: SalesInput, r: Range, cmp: Range, now = new Dat
   /* Breakdowns */
   const bySource = tally(cur.created.map((l) => l.source));
   const lostBrands = tally(cur.closed.filter((l) => l.status === "lost_other_dealer").map((l) => l.lostToBrand?.trim() || "Unknown"));
-  const modelRows = new Map<string, { model: string; enquiries: number; drives: number; won: number }>();
+  const modelRows = new Map<string, { model: string; dealershipId: string | null; enquiries: number; drives: number; won: number }>();
   for (const i of input.interests) {
     const l = leadById.get(i.leadId);
     if (!l) continue;
-    const row = modelRows.get(i.model) ?? { model: i.model, enquiries: 0, drives: 0, won: 0 };
+    const key = `${i.model}|${l.dealershipId ?? ""}`;
+    const row = modelRows.get(key) ?? { model: i.model, dealershipId: l.dealershipId ?? null, enquiries: 0, drives: 0, won: 0 };
     if (cur.createdIds.has(l.id)) row.enquiries++;
     if (cur.drivesDone.some((d) => d.leadId === l.id)) row.drives++;
     if (cur.won.some((w) => w.id === l.id)) row.won++;
-    modelRows.set(i.model, row);
+    modelRows.set(key, row);
   }
   const consultants = input.consultants.map((c) => {
     const mine = (l: KLead) => l.consultantId === c.id;
@@ -121,6 +123,7 @@ export function salesKpis(input: SalesInput, r: Range, cmp: Range, now = new Dat
     return {
       id: c.id,
       name: c.name,
+      dealershipId: c.dealershipId ?? null,
       enquiries: cur.created.filter(mine).length,
       testDrives: cur.drivesDone.filter((d) => leadById.get(d.leadId)?.consultantId === c.id).length,
       won: w,

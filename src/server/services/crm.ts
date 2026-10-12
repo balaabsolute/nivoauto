@@ -17,6 +17,7 @@ import {
   prospectScore, VISIT_LABELS, BUDGET_RANGES, type CloseInput, type NurtureSkip,
 } from "@/domain/crm";
 import { businessDate, isIsoDate } from "@/domain/periods";
+import { dealerColor } from "@/domain/dealer-colors";
 import type { Actor } from "../principal";
 import { audit } from "../audit";
 import { notify } from "../notify/dispatcher";
@@ -1020,10 +1021,11 @@ export async function convertProspect(db: DB, actor: Actor, id: string, targetDe
 export async function salesDealerships(db: DB, actor: Actor) {
   const scope = dealershipScope(actor);
   return db
-    .select({ id: dealerships.id, name: dealerships.name, brandId: dealerships.brandId })
+    .select({ id: dealerships.id, name: dealerships.name, brandId: dealerships.brandId, code: dealerships.code, color: dealerships.color })
     .from(dealerships)
     .where(and(eq(dealerships.active, true), eq(dealerships.hasSales, true), demoFilter(dealerships.isDemo), scope === "all" ? undefined : scope.length ? inArray(dealerships.id, scope) : sql`false`))
-    .orderBy(asc(dealerships.name));
+    .orderBy(asc(dealerships.name))
+    .then((rows) => rows.map((d) => ({ ...d, color: dealerColor(d) })));
 }
 
 

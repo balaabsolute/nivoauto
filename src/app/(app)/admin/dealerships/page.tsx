@@ -6,6 +6,8 @@ import { first, type SP } from "@/server/period-params";
 import { PageHeader, Panel, Chip } from "@/components/ui";
 import { ActionForm, Submit } from "@/components/ActionForm";
 import { AdminTabs } from "../AdminTabs";
+import { DEALER_PALETTE, dealerColor } from "@/domain/dealer-colors";
+import { DealerName } from "@/components/ui";
 import { saveEntityAction, saveBrandAction, saveDealershipAction } from "../actions";
 
 export const metadata = { title: "Entities & dealerships" };
@@ -26,7 +28,7 @@ export default async function AdminDealerships({ searchParams }: { searchParams:
             <tbody>{md.dealerships.map((d) => (
               <tr key={d.id} className="border-b border-line last:border-0">
                 <td className="td font-mono text-xs">{d.code}</td>
-                <td className="td"><div className="font-medium">{d.name}</div><div className="text-xs text-ink-3">{d.locationName}{d.city ? `, ${d.city}` : ""}</div></td>
+                <td className="td"><div className="font-medium"><DealerName name={d.name} color={dealerColor(d)} /></div><div className="text-xs text-ink-3">{d.locationName}{d.city ? `, ${d.city}` : ""}</div></td>
                 <td className="td text-xs">{md.brands.find((b) => b.id === d.brandId)?.name} · {md.legalEntities.find((l) => l.id === d.legalEntityId)?.name}</td>
                 <td className="td"><span className="flex flex-wrap gap-1">{d.hasSales && <Chip>Sales</Chip>}{d.hasService && <Chip>Service</Chip>}{d.hasBodyShop && <Chip>Body shop</Chip>}{!d.active && <Chip tone="crit">Inactive</Chip>}{d.isDemo && <Chip tone="warn">Demo</Chip>}</span></td>
                 <td className="td"><Link href={`/admin/dealerships?edit=${d.id}`} className="text-petrol hover:underline">Edit</Link></td>
@@ -46,6 +48,21 @@ export default async function AdminDealerships({ searchParams }: { searchParams:
               <label><span className="label">Location</span><input name="locationName" defaultValue={e?.locationName} required className="field" /></label>
               <label><span className="label">City</span><input name="city" defaultValue={e?.city ?? ""} className="field" /></label>
             </div>
+            <fieldset>
+              <legend className="label">Identity colour (used for this dealership across the portal)</legend>
+              <div className="flex flex-wrap gap-2">
+                {DEALER_PALETTE.map((c) => {
+                  const used = md.dealerships.find((x) => x.color === c.hex && x.id !== e?.id);
+                  return (
+                    <label key={c.hex} className="flex items-center gap-1.5 text-xs rounded border border-line px-2 py-1 cursor-pointer has-[:checked]:border-ink">
+                      <input type="radio" name="color" value={c.hex} defaultChecked={e?.color === c.hex} className="sr-only" />
+                      <span className="h-3.5 w-3.5 rounded-sm" style={{ background: c.hex }} aria-hidden />
+                      {c.name}{used ? <span className="text-ink-3">· {used.code}</span> : null}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
             <div className="flex flex-wrap gap-4 text-sm">
               <label className="flex items-center gap-1.5"><input type="checkbox" name="hasSales" defaultChecked={e?.hasSales ?? true} /> Sales</label>
               <label className="flex items-center gap-1.5"><input type="checkbox" name="hasService" defaultChecked={e?.hasService ?? true} /> Service</label>

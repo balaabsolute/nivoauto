@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import { getDb } from "@/db/client";
 import { requireCap } from "@/server/auth";
 import { listAlerts, alertOwnerOptions } from "@/server/services/reporting";
@@ -15,6 +17,7 @@ export const metadata = { title: "Management actions" };
 
 export default async function AlertsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("alerts.view");
+  const dc = await dealerColors();
   const includeClosed = first((await searchParams).closed) === "1";
   const db = await getDb();
   const rows = await listAlerts(db, actor, { includeClosed });
@@ -43,7 +46,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityChip severity={a.severity} />
                 <span className="font-semibold">{a.title}</span>
-                <span className="text-sm text-ink-2">{dealershipName ?? "Group"}</span>
+                <span className="text-sm text-ink-2">{dealershipName ? <DealerName name={dealershipName} color={dc.of(dealershipName)} size="sm" /> : "Group"}</span>
                 {!a.active && <Chip tone="neutral">No longer firing</Chip>}
                 <Chip tone={a.status === "resolved" ? "good" : a.status === "dismissed" ? "neutral" : a.status === "open" ? "info" : "petrol"}>{a.status.replace("_", " ")}</Chip>
               </div>

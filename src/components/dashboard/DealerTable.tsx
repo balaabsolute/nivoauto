@@ -3,10 +3,12 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { formatInrCompact, formatPct, formatInt } from "@/domain/format";
+import { DealerName } from "@/components/ui";
 
 export interface DealerTableRow {
   id: string;
   name: string;
+  color: string;
   brand: string;
   entity: string;
   location: string;
@@ -92,7 +94,7 @@ function DealerCard({ r, query, showFinancials }: { r: DealerTableRow; query: st
       <Link href={`/dealerships/${r.id}?${query}`} className={clsx("block h-full rounded-lg border border-line border-t-4 bg-panel p-4 hover:border-petrol/40 hover:shadow-sm transition", attention)}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-semibold text-ink truncate">{r.name}</p>
+            <p className="font-semibold text-ink"><DealerName name={r.name} color={r.color} /></p>
             <p className="text-xs text-ink-3 truncate">{r.entity} · {r.location}</p>
           </div>
           <SignalChip r={r} />

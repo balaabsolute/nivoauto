@@ -7,7 +7,7 @@ import { describeEvidence } from "@/domain/alerts";
 import { COMMON_STAGE_LABELS, BODYSHOP_COMMON_STAGES, SERVICE_COMMON_STAGES, type CommonStage } from "@/domain/workflow";
 import { AGEING_BUCKETS } from "@/domain/kpi";
 import { growthPct } from "@/domain/kpi";
-import { Panel, Delta, SeverityChip, EmptyState, ProgressBar } from "@/components/ui";
+import { Panel, Delta, SeverityChip, EmptyState, ProgressBar, DealerName } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { MixBars } from "./MixBars";
 import type { DealerTableRow } from "./DealerTable";
@@ -20,19 +20,19 @@ const toneFor = (pct: number | null): Tone => (pct == null ? "petrol" : pct >= 1
 const TONE_TEXT: Record<Tone, string> = { good: "text-good", warn: "text-warn", crit: "text-crit", petrol: "text-petrol" };
 
 function KpiCard({ label, value, href, children, accent }: { label: string; value: React.ReactNode; href?: string; children?: React.ReactNode; accent?: Tone }) {
-  const body = (
+  const head = (
     <>
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-[13px] font-medium text-ink-2">{label}</h3>
         {href && <span className="text-xs text-petrol" aria-hidden>View →</span>}
       </div>
       <p className={clsx("mt-2 text-[30px] leading-none font-semibold tracking-tight num", accent && TONE_TEXT[accent])}>{value}</p>
-      {children && <div className="mt-3 space-y-2">{children}</div>}
     </>
   );
   return (
     <section className="panel p-4 min-w-0 flex flex-col">
-      {href ? <Link href={href} className="block hover:opacity-90">{body}</Link> : body}
+      {href ? <Link href={href} className="block hover:opacity-90">{head}</Link> : head}
+      {children && <div className="mt-3 space-y-2">{children}</div>}
     </section>
   );
 }
@@ -90,7 +90,7 @@ export function KpiCards({ m, dealers, showFinancials, jobsHref, query, dealerCa
         <p className="text-xs text-ink-3">Service {formatInt(m.service.openAtEnd)} open · {formatInt(m.service.overdueAtEnd)} overdue<br />Body shop {formatInt(m.bodyshop.openAtEnd)} open · {formatInt(m.bodyshop.overdueAtEnd)} overdue</p>
       </KpiCard>
       {dealerCard ?? (best ? (
-        <KpiCard label="Best performing dealership" value={<span className="text-[24px]">{best.row.dealer.name}</span>} href={`/dealerships/${best.row.dealer.id}${query ? `?${query}` : ""}`} accent="good">
+        <KpiCard label="Best performing dealership" value={<span className="text-[24px]"><DealerName name={best.row.dealer.name} color={best.row.dealer.color} /></span>} href={`/dealerships/${best.row.dealer.id}${query ? `?${query}` : ""}`}>
           <p className="text-sm">
             {best.basis === "target" ? <><span className="font-semibold text-good num">{formatPct(best.row.revenueTargetAchievementPct)}</span> of revenue target</>
               : best.basis === "growth" ? <><span className="font-semibold text-good num">{formatDelta(best.row.revenueGrowthPct)}</span> revenue growth</>
@@ -98,7 +98,7 @@ export function KpiCards({ m, dealers, showFinancials, jobsHref, query, dealerCa
             {showFinancials && <span className="text-ink-2"> · {formatInrCompact(best.row.revenue.total)}</span>}
           </p>
           <p className="text-xs text-ink-3">{formatInt(best.row.revenue.vehiclesDelivered)} vehicles delivered{best.row.deliveriesAchievementPct != null ? ` (${formatPct(best.row.deliveriesAchievementPct)} of target)` : ""}</p>
-          {best.runnerUp && <p className="text-xs text-ink-3 border-t border-line pt-2">Next: {best.runnerUp.dealer.name}{best.basis === "target" ? ` · ${formatPct(best.runnerUp.revenueTargetAchievementPct)}` : ""}</p>}
+          {best.runnerUp && <p className="text-xs text-ink-3 border-t border-line pt-2">Next: <DealerName name={best.runnerUp.dealer.name} color={best.runnerUp.dealer.color} size="sm" />{best.basis === "target" ? ` · ${formatPct(best.runnerUp.revenueTargetAchievementPct)}` : ""}</p>}
           <p className="text-[11px] text-ink-3">Ranked by {best.basis === "target" ? "revenue achieved against approved target" : best.basis === "growth" ? "revenue growth (no approved targets)" : "revenue"}</p>
         </KpiCard>
       ) : (
@@ -302,7 +302,7 @@ export function BodyShopPanel({ m }: { m: UnitMetrics }) {
 
 /* ───────────── Management insights ───────────── */
 
-export function InsightsPanel({ alerts, limit = 6, showDealer = true, grid = false }: { alerts: AlertView[]; limit?: number; showDealer?: boolean; grid?: boolean }) {
+export function InsightsPanel({ alerts, limit = 6, showDealer = true, grid = false, colors }: { alerts: AlertView[]; limit?: number; showDealer?: boolean; grid?: boolean; colors?: Record<string, string> }) {
   const shown = alerts.filter((a) => a.status !== "resolved" && a.status !== "dismissed").slice(0, limit);
   return (
     <Panel
@@ -320,7 +320,7 @@ export function InsightsPanel({ alerts, limit = 6, showDealer = true, grid = fal
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityChip severity={a.severity} />
                 <span className="font-medium text-sm">{a.title}</span>
-                {showDealer && a.dealershipName && <span className="text-xs text-ink-3">{a.dealershipName}</span>}
+                {showDealer && a.dealershipName && <span className="text-xs text-ink-3">{colors?.[a.dealershipName] ? <DealerName name={a.dealershipName} color={colors[a.dealershipName]} size="sm" /> : a.dealershipName}</span>}
               </div>
               <p className="text-sm text-ink-2 mt-1">{a.observedFact}</p>
               <details className="mt-1 text-xs">
@@ -352,9 +352,6 @@ export function FreshnessStrip({ d, scopeLabel }: { d: Dashboard; scopeLabel: st
   const items = [
     { label: "Last update", value: relativeTime(lastUpdate), warn: f.stale },
     { label: "Reporting coverage", value: `${d.coverage.dealershipsReporting} of ${d.coverage.dealershipsTotal} ${scopeLabel}`, warn: d.coverage.dealershipsReporting < d.coverage.dealershipsTotal },
-    { label: "Daily reports", value: f.dailyReportsExpected ? `${f.dailyReportsSubmitted} of ${f.dailyReportsExpected}` : "—", warn: f.dailyReportsSubmitted < f.dailyReportsExpected },
-    { label: "Unreconciled revenue", value: `${formatInrCompact(f.unreconciledAmount)} (${formatInt(f.unreconciledLines)} lines)`, warn: f.unreconciledLines > 0 },
-    { label: "Reconciled", value: formatPct(d.total.revenue.reconciledPct), warn: (d.total.revenue.reconciledPct ?? 0) < 100 },
   ];
   return (
     <section aria-label="Data freshness and completeness" className="mb-4">
@@ -385,6 +382,7 @@ export function toTableRows(rows: DealerRow[]): DealerTableRow[] {
     return {
       id: r.dealer.id,
       name: r.dealer.name,
+      color: r.dealer.color,
       brand: r.dealer.brand,
       entity: r.dealer.legalEntity,
       location: r.dealer.location,

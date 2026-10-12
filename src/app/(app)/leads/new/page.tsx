@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCap } from "@/server/auth";
@@ -12,6 +14,7 @@ export const metadata = { title: "New enquiry" };
 
 export default async function NewLeadPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("leads.manage");
+  const dc = await dealerColors();
   const db = await getDb();
   const dealers = await salesDealerships(db, actor);
   const dealerId = first((await searchParams).dealer) ?? dealers[0]?.id;
@@ -20,7 +23,7 @@ export default async function NewLeadPage({ searchParams }: { searchParams: Prom
     <div className="max-w-3xl">
       <PageHeader back={{ href: "/leads", label: "Enquiries" }} title="New enquiry" subtitle="Phone, web or referral enquiries. Showroom walk-ins come from the kiosk or the front desk." />
       {dealers.length > 1 && (
-        <div className="flex flex-wrap gap-2 mb-4 text-[13px]">{dealers.map((d) => <Link key={d.id} href={`/leads/new?dealer=${d.id}`} className={`chip ${dealerId === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>{d.name}</Link>)}</div>
+        <div className="flex flex-wrap gap-2 mb-4 text-[13px]">{dealers.map((d) => <Link key={d.id} href={`/leads/new?dealer=${d.id}`} className={`chip ${dealerId === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}><DealerName name={d.name} color={dc.of(d.id)} size="sm" /></Link>)}</div>
       )}
       {!dealerId ? <Panel><EmptyState title="No sales dealership in your scope" /></Panel> : (
         <ActionForm action={createLeadAction} className="space-y-4">

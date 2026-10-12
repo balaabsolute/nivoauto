@@ -7,10 +7,12 @@ import { can } from "@/domain/permissions";
 import { businessDate, periodRangeLabel } from "@/domain/periods";
 import { formatInt, formatPct } from "@/domain/format";
 import { first, periodFromParams, type SP } from "@/server/period-params";
-import { PageHeader, Panel, Notice, EmptyState } from "@/components/ui";
+import { PageHeader, Panel, Notice } from "@/components/ui";
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { Tile, TileGroup, TallyBars, OutcomeBar } from "@/components/crm/kpi";
 import { LeadTabs } from "../LeadTabs";
+import { ConsultantTable, ModelTable } from "@/components/crm/PerformanceTables";
+import { DealerName } from "@/components/ui";
 
 export const metadata = { title: "Sales performance" };
 
@@ -32,6 +34,7 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
     if (id) p.set("dealer", id);
     return `/leads/performance?${p.toString()}`;
   };
+  const dealerOpts = dealers.filter((d) => !dealer || d.id === dealer).map((d) => ({ id: d.id, name: d.name, color: d.color }));
   const p = k.pipeline;
   const n = k.nurture;
 
@@ -47,21 +50,17 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
       {dealers.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4 text-[13px]">
           <Link href={qs(null)} className={`chip ${!dealer ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>All dealerships</Link>
-          {dealers.map((d) => <Link key={d.id} href={qs(d.id)} className={`chip ${dealer === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>{d.name}</Link>)}
+          {dealers.map((d) => <Link key={d.id} href={qs(d.id)} className={`chip ${dealer === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}><DealerName name={d.name} color={d.color} size="sm" /></Link>)}
         </div>
       )}
 
       <div className="space-y-6">
-        <TileGroup title="Sales" subtitle="Enquiries created, test drives completed and outcomes recorded in the period">
+        <TileGroup title="Sales & pipeline" subtitle="Enquiries, test drives and outcomes in the period · pipeline as of now" cols={5}>
           <Tile label="New enquiries" value={formatInt(k.enquiries)} delta={k.enquiriesGrowthPct} note={k.bySource[0] ? `Most from ${SOURCE[k.bySource[0].key] ?? k.bySource[0].key}` : undefined} />
           <Tile label="Test drives completed" value={formatInt(k.testDrives)} delta={k.testDrivesGrowthPct} note={`Test-drive rate ${formatPct(k.testDriveRatePct)}`} />
-          <Tile label="Cars sold (won)" value={formatInt(k.won)} delta={k.wonGrowthPct} tone={k.won ? "good" : undefined} />
-          <Tile label="Close rate" value={formatPct(k.closeRatePct)} note={`${formatInt(k.won)} won of ${formatInt(k.closed)} closed`} />
+          <Tile label="Cars sold (won)" value={formatInt(k.won)} delta={k.wonGrowthPct} tone={k.won ? "good" : undefined} note={`Close rate ${formatPct(k.closeRatePct)} · ${formatInt(k.won)} of ${formatInt(k.closed)} closed`} />
           <Tile label="Lost to competition" value={formatInt(k.lostOtherDealer)} tone={k.lostOtherDealer ? "warn" : undefined} note={k.lostBrands[0] ? `${formatPct(k.lostToCompetitionPct)} of closed · most to ${k.lostBrands[0].key}` : `${formatPct(k.lostToCompetitionPct)} of closed`} />
           <Tile label="Median days to sale" value={k.medianDaysToWin == null ? "—" : `${k.medianDaysToWin} d`} note="Enquiry created → sold" />
-        </TileGroup>
-
-        <TileGroup title="Pipeline now" subtitle="Open enquiries as of now (or the period end)" cols={5}>
           <Tile label="Open enquiries" value={formatInt(p.openNow)} note={`${formatInt(p.openAtEnd)} open at period end`} href="/leads" />
           <Tile label="Hot (buying within a month)" value={formatInt(p.hot)} tone={p.hot ? "good" : undefined} />
           <Tile label="Unassigned" value={formatInt(p.unassigned)} tone={p.unassigned ? "warn" : undefined} href="/leads?consultant=unassigned" />
@@ -95,48 +94,8 @@ export default async function PerformancePage({ searchParams }: { searchParams: 
           </Panel>
         </div>
 
-        <div className="grid gap-4">
-          <Panel title="Sales consultants" subtitle="Activity and results in the period" bodyClassName="px-0 pb-0">
-            {!k.consultants.length ? <EmptyState title="No consultant activity in this period" icon="users" /> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead className="border-b border-line"><tr>
-                    <th className="th">Consultant</th><th className="th text-right">Enquiries</th><th className="th text-right">Test drives</th><th className="th text-right">Sold</th><th className="th text-right">Close rate</th>
-                    <th className="th text-right">Follow-ups done</th><th className="th text-right">Contacts</th><th className="th text-right">Open / overdue now</th>
-                  </tr></thead>
-                  <tbody>
-                    {k.consultants.map((c) => (
-                      <tr key={c.id} className="border-b border-line last:border-0">
-                        <td className="td font-medium">{c.name}</td>
-                        <td className="td text-right num">{formatInt(c.enquiries)}</td>
-                        <td className="td text-right num">{formatInt(c.testDrives)}</td>
-                        <td className="td text-right num font-medium">{formatInt(c.won)}</td>
-                        <td className="td text-right num">{formatPct(c.closeRatePct)}</td>
-                        <td className="td text-right num">{formatPct(c.followUpsDonePct)} <span className="text-xs text-ink-3">of {c.followUpsDue}</span></td>
-                        <td className="td text-right num">{formatInt(c.contacts)}</td>
-                        <td className="td text-right num">{formatInt(c.openNow)} / <span className={c.overdueNow ? "text-crit font-medium" : ""}>{formatInt(c.overdueNow)}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Panel>
-          <Panel title="Models" subtitle="Interest, test drives and sales by model" bodyClassName="px-0 pb-0">
-            {!k.models.length ? <EmptyState title="No model activity in this period" icon="car" /> : (
-              <table className="w-full text-sm">
-                <thead className="border-b border-line"><tr><th className="th">Model</th><th className="th text-right">Enquiries</th><th className="th text-right">Test drives</th><th className="th text-right">Test-drive share</th><th className="th text-right">Sold</th></tr></thead>
-                <tbody>
-                  {k.models.slice(0, 15).map((m) => (
-                    <tr key={m.model} className="border-b border-line last:border-0">
-                      <td className="td">{m.model}</td><td className="td text-right num">{formatInt(m.enquiries)}</td><td className="td text-right num">{formatInt(m.drives)}</td><td className="td text-right num">{m.enquiries ? formatPct((m.drives / m.enquiries) * 100) : "—"}</td><td className="td text-right num font-medium">{formatInt(m.won)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Panel>
-        </div>
+        <ConsultantTable rows={k.consultants} dealers={dealerOpts} />
+        <ModelTable rows={k.models} dealers={dealerOpts} />
         <p className="text-xs text-ink-3">Definitions: docs/KPI_DEFINITIONS.md §8b. “Engaged after an update” counts enquiries with a call, visit, message, test drive or sale recorded after they received a model update.</p>
       </div>
     </>

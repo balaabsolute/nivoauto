@@ -15,6 +15,13 @@
       "when": 1791790183229,
       "tag": "0001_showroom_crm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791819435956,
+      "tag": "0002_dealership_colour",
+      "breakpoints": true
     }
   ]
 }

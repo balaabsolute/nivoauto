@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCap } from "@/server/auth";
@@ -16,6 +18,7 @@ const STATUS = { scheduled: { t: "info", l: "Scheduled" }, attended: { t: "good"
 
 export default async function AppointmentsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("appointments.manage");
+  const dc = await dealerColors();
   const sp = await searchParams;
   const today = businessDate();
   const day = isIsoDate(first(sp.date)) ? first(sp.date)! : today;
@@ -49,7 +52,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
                     <div className="flex-1 min-w-[180px]">
                       <p className="font-medium">{r.reg} <span className="text-ink-3 text-sm font-normal">{r.model}</span></p>
                       <p className="text-sm text-ink-2">{r.customerName} · {r.a.requestedWork}</p>
-                      {dealers.length > 1 && <p className="text-xs text-ink-3">{r.dealershipName}</p>}
+                      {dealers.length > 1 && <p className="text-xs text-ink-3"><DealerName name={r.dealershipName} color={dc.of(r.dealershipName)} size="sm" /></p>}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Chip tone={st.t}>{st.l}</Chip>

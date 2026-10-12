@@ -114,6 +114,7 @@ export const dealershipInput = z.object({
   hasSales: z.boolean(),
   hasService: z.boolean(),
   hasBodyShop: z.boolean(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Colour must be a hex value").nullable().optional(),
   active: z.boolean().default(true),
 });
 

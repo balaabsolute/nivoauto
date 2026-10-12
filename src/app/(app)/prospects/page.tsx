@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCap } from "@/server/auth";
@@ -26,6 +28,7 @@ const STATUS = { new: "New", contacted: "Contacted", converted: "Converted", not
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("prospects.view");
+  const dc = await dealerColors();
   const sp = await searchParams;
   const db = await getDb();
   const today = businessDate();
@@ -111,7 +114,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
                     </p>
                     {r.preferredModels.length > 0 && <p className="text-sm mt-0.5">Likes: {r.preferredModels.map((m) => `${m.brand} ${m.name}`).join(", ")}</p>}
                     {r.f.otherPreferences && <p className="text-sm text-ink-2 mt-0.5">“{r.f.otherPreferences}”</p>}
-                    <p className="text-xs text-ink-3 mt-1">{r.dealershipName} lounge · {formatDate(r.f.createdAt)}{r.f.serviceRating ? ` · rated today’s service ${"★".repeat(r.f.serviceRating)}` : ""}</p>
+                    <p className="text-xs text-ink-3 mt-1"><DealerName name={`${r.dealershipName} lounge`} color={dc.of(r.dealershipName)} size="sm" /> · {formatDate(r.f.createdAt)}{r.f.serviceRating ? ` · rated today’s service ${"★".repeat(r.f.serviceRating)}` : ""}</p>
                   </div>
                   {manage && r.f.status !== "converted" && (
                     <div className="flex flex-wrap items-start gap-2 lg:justify-end">

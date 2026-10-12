@@ -1,7 +1,11 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCap } from "@/server/auth";
-import { listJobs } from "@/server/services/jobs";
+import { listJobs, jobSummary } from "@/server/services/jobs";
+import { Tile } from "@/components/crm/kpi";
+import { formatInt, formatPct } from "@/domain/format";
 import { loadDealers } from "@/server/analytics";
 import { can, dealershipScope } from "@/domain/permissions";
 import { first, type SP } from "@/server/period-params";
@@ -14,6 +18,7 @@ export const metadata = { title: "Service jobs" };
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("jobs.view");
+  const dc = await dealerColors();
   const sp = await searchParams;
   // Technicians see all their assigned work (service + body shop) unless they pick a type.
   const typeParam = first(sp.type);
@@ -26,9 +31,10 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const blocked = first(sp.blocked) === "1";
   const mine = first(sp.mine) === "1" || actor.role === "technician";
   const db = await getDb();
-  const [rows, dealers] = await Promise.all([
+  const [rows, dealers, k] = await Promise.all([
     listJobs(db, actor, { jobType: typeFilter, status, dealershipId: dealer, q, overdue, blocked, mine }),
     loadDealers(db, dealershipScope(actor)),
+    jobSummary(db, actor, { jobType: typeFilter, dealershipId: dealer, mine }),
   ]);
   const now = new Date();
   const link = (patch: Record<string, string | null>) => {
@@ -51,6 +57,15 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
           </>
         }
       />
+
+      <dl className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 mb-5" aria-label="Job summary">
+        <Tile label="Open jobs" value={formatInt(k.open)} note={`${formatInt(k.openedToday)} opened today`} href={link({ status: "open", overdue: null, blocked: null })} />
+        <Tile label="Overdue" value={formatInt(k.overdue)} tone={k.overdue ? "crit" : "good"} note={k.open ? `${formatPct((k.overdue / k.open) * 100)} of open jobs` : undefined} href={link({ status: "open", overdue: "1", blocked: null })} />
+        <Tile label="Due today" value={formatInt(k.dueToday)} tone={k.dueToday ? "warn" : undefined} note="Promised later today" />
+        <Tile label="Awaiting approval" value={formatInt(k.awaitingApproval)} tone={k.awaitingApproval ? "warn" : undefined} note="Customer or insurer" />
+        <Tile label="Blocked" value={formatInt(k.blocked)} tone={k.blocked ? "warn" : undefined} note={`${formatInt(k.waitingParts)} waiting on parts`} href={link({ status: "open", blocked: "1", overdue: null })} />
+        <Tile label="Delivered this month" value={formatInt(k.deliveredMtd)} tone="good" note={<>{formatInt(k.deliveredToday)} today · {formatPct(k.onTimePctMtd)} on time{k.avgTatHoursMtd != null ? ` · avg ${k.avgTatHoursMtd < 48 ? `${k.avgTatHoursMtd} h` : `${(k.avgTatHoursMtd / 24).toFixed(1)} d`}` : ""}</>} />
+      </dl>
 
       <form className="flex flex-wrap items-end gap-2 mb-3" action="/jobs">
         <input type="hidden" name="type" value={type} />
@@ -134,7 +149,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                         <Link href={`/jobs/${r.job.id}`} className="font-medium text-petrol hover:underline">{r.reg}</Link>
                         <div className="text-xs text-ink-3">{r.job.jobNo}</div>
                       </td>
-                      {dealers.length > 1 && <td className="td text-sm">{r.dealershipName}</td>}
+                      {dealers.length > 1 && <td className="td text-sm whitespace-nowrap"><DealerName name={r.dealershipName} color={dc.of(r.dealershipName)} size="sm" /></td>}
                       <td className="td max-w-[280px]">
                         <div className="text-sm">{r.customerName}</div>
                         <div className="text-xs text-ink-3 line-clamp-1">{r.make} {r.model} · {r.job.complaint}</div>

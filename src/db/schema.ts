@@ -57,6 +57,7 @@ export const dealerships = pgTable("dealerships", {
   hasSales: boolean("has_sales").notNull().default(true),
   hasService: boolean("has_service").notNull().default(true),
   hasBodyShop: boolean("has_body_shop").notNull().default(false),
+  color: text("color"), // identity colour used across the portal (hex from DEALER_PALETTE)
   active: boolean("active").notNull().default(true),
   isDemo: boolean("is_demo").notNull().default(false),
   createdAt: createdAt(),

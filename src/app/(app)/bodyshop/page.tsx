@@ -1,3 +1,5 @@
+import { DealerName } from "@/components/ui";
+import { dealerColors } from "@/server/dealer-colors";
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCap } from "@/server/auth";
@@ -15,6 +17,7 @@ export const metadata = { title: "Body shop" };
 
 export default async function BodyShopPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireCap("jobs.view");
+  const dc = await dealerColors();
   const sp = await searchParams;
   const db = await getDb();
   const dealers = (await loadDealers(db, dealershipScope(actor))).filter((d) => d.hasBodyShop);
@@ -41,7 +44,7 @@ export default async function BodyShopPage({ searchParams }: { searchParams: Pro
       {dealers.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-4 text-[13px]">
           <Link href="/bodyshop" className={`chip ${!dealer ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>All body shops</Link>
-          {dealers.map((d) => <Link key={d.id} href={`/bodyshop?dealer=${d.id}`} className={`chip ${dealer === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}>{d.name}</Link>)}
+          {dealers.map((d) => <Link key={d.id} href={`/bodyshop?dealer=${d.id}`} className={`chip ${dealer === d.id ? "bg-ink text-white" : "bg-panel border border-line text-ink-2"}`}><DealerName name={d.name} color={dc.of(d.id)} size="sm" /></Link>)}
         </div>
       )}
       {!dealers.length ? (

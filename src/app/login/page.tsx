@@ -35,12 +35,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         </div>
         <p className="text-xs text-white/60">Group Intelligence &amp; Digital Operations Platform · Phase 1 pilot</p>
       </section>
-      <section className="flex items-center justify-center p-6 sm:p-12 bg-panel">
+      <section className="relative flex items-center justify-center p-6 sm:p-12 bg-panel">
         <div className="w-full max-w-sm">
           <h2 className="text-2xl font-semibold">Sign in</h2>
           <p className="text-sm text-ink-2 mt-1 mb-6">Use your Kun work account.</p>
           <LoginForm next={next} demoAccounts={DATA_MODE === "demo" ? DEMO : undefined} demoPassword={DATA_MODE === "demo" ? DEMO_PASSWORD : undefined} />
         </div>
+        <p className="absolute bottom-4 right-6 text-xs text-ink-3">Concept and Developed by <a href="https://idataone.com" target="_blank" rel="noopener" className="font-medium text-petrol hover:underline">iDataOne</a></p>
       </section>
     </main>
   );

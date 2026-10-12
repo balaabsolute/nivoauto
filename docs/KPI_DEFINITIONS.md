@@ -171,6 +171,14 @@ model updates = prospects messaged directly in the period.
 for the period. Without approved targets it falls back to revenue growth, then to revenue; the basis is
 printed on the card.
 
+### 8c. Service jobs summary (`jobSummary`, `/jobs`)
+
+Cards above the job list follow the job type, dealership and "mine" filters but not the list's status or
+search filters. Open = status open now. Overdue = open and past the promised (or expected) time. Due today =
+open, promised between now and midnight. Awaiting approval = approval pending. Blocked = any blocker, with
+parts shown separately. Delivered this month = delivered since the 1st; on time = delivered at or before the
+promised time ÷ delivered with a promise; average turnaround = mean hours from opening to delivery.
+
 ## 9. Management alerts (`src/domain/alerts.ts`)
 
 Transparent rules, evaluated when a dashboard is viewed and stored with owner, due date, status and history.
