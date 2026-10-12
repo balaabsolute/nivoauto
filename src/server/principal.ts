@@ -3,6 +3,7 @@ import type { DB } from "@/db/client";
 import { users, userDealerships } from "@/db/schema";
 import type { Principal } from "@/domain/permissions";
 import type { Role } from "@/db/schema";
+import { DATA_MODE } from "./data-mode";
 
 export interface Actor extends Principal {
   name: string;
@@ -12,6 +13,7 @@ export interface Actor extends Principal {
 export async function loadActor(db: DB, userId: string): Promise<Actor | null> {
   const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!u || !u.active) return null;
+  if (DATA_MODE === "live" && u.isDemo) return null; // demo accounts never work against live data
   const scopes = await db.select({ d: userDealerships.dealershipId }).from(userDealerships).where(eq(userDealerships.userId, userId));
   return { id: u.id, role: u.role as Role, name: u.name, email: u.email, dealershipIds: scopes.map((s) => s.d) };
 }

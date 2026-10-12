@@ -90,7 +90,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
           <li>Capacity imbalance: service bay utilisation above {ALERT_THRESHOLDS.utilisationHighPct}% or below {ALERT_THRESHOLDS.utilisationLowPct}% (completed days only).</li>
           <li>Revenue up, margin down: revenue higher than the comparison period while gross margin fell by {ALERT_THRESHOLDS.marginDropPp} percentage points or more (only where cost data is adequate).</li>
           <li>Approval wait: jobs waiting more than {ALERT_THRESHOLDS.approvalWaitDays} days for customer or insurer approval.</li>
-          <li>Daily report missing: no submitted report for any of the last 3 completed days.</li>
+          <li>Daily report missing: a submitted report is missing for one or more of the last 3 completed days.</li>
         </ul>
       </details>
     </>

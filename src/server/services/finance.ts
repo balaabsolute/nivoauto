@@ -110,7 +110,7 @@ export async function importTransactionsCsv(db: DB, actor: Actor, fileName: stri
   if (missing.length) throw new ValidationError([`Missing required column(s): ${missing.join(", ")}`]);
   if (rows.length > 20_000) throw new ValidationError(["File is too large — split into files of 20,000 rows or fewer"]);
 
-  const dealers = await db.select().from(dealerships);
+  const dealers = await db.select().from(dealerships).where(demoFilter(dealerships.isDemo));
   const byCode = new Map(dealers.map((d) => [d.code.toUpperCase(), d]));
   const today = businessDate();
   const results: ImportRowResult[] = [];

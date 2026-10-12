@@ -2,7 +2,7 @@ import { and, asc, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizz
 import { z } from "zod";
 import type { DB } from "@/db/client";
 import {
-  jobs, jobEvents, jobChecklistItems, jobParts, jobPhotos, labourLogs, customers, vehicles, dealerships, users,
+  jobs, jobEvents, jobChecklistItems, jobParts, jobPhotos, labourLogs, customers, vehicles, dealerships, users, userDealerships,
   workflowStages, notifications, BLOCKERS, PAYMENT_STATUSES, type JobType, type Blocker,
 } from "@/db/schema";
 import {
@@ -10,7 +10,9 @@ import {
 } from "@/domain/workflow";
 import { assertCan, assertDealership, can, canMoveJob, canViewJob, ForbiddenError, dealershipScope } from "@/domain/permissions";
 import { isCustomerFacingDelay } from "@/domain/notifications";
-import { businessDate } from "@/domain/periods";
+import { businessDate, addDays } from "@/domain/periods";
+
+const LABOUR_BACKDATE_DAYS = 7;
 import type { Actor } from "../principal";
 import { audit, diff } from "../audit";
 import { notify, type NotifyRequest } from "../notify/dispatcher";
@@ -52,7 +54,7 @@ export function normalisePhone(p: string | null | undefined): string | null {
 
 async function loadJobForWrite(db: DB, actor: Actor, jobId: string) {
   const [j] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
-  if (!j) throw new NotFoundError("Job not found");
+  if (!j || (DATA_MODE === "live" && j.isDemo)) throw new NotFoundError("Job not found");
   if (!canViewJob(actor, j)) throw new ForbiddenError("This job is outside your access scope");
   return j;
 }
@@ -337,11 +339,17 @@ export async function updateJob(db: DB, actor: Actor, jobId: string, raw: Update
     if (!(can(actor, "jobs.work") && job.assignedToId === actor.id)) throw new ForbiddenError();
     const illegal = Object.keys(patch).filter((k) => !TECH_FIELDS.includes(k as keyof UpdateJobInput));
     if (illegal.length) throw new ForbiddenError(`Your role cannot change: ${illegal.join(", ")}`);
+    // Technicians may REPORT a blocker but not clear one (clearing is an advisor/manager decision).
+    if (patch.blocker !== undefined && patch.blocker !== job.blocker && (patch.blocker === "none" || job.blocker !== "none")) {
+      throw new ForbiddenError("Only the service advisor or manager can clear or change an existing blocker");
+    }
   }
 
   if (patch.assignedToId) {
     const [tech] = await db.select().from(users).where(eq(users.id, patch.assignedToId));
     if (!tech || !tech.active || tech.role !== "technician") throw new ValidationError(["Assignee must be an active technician"]);
+    const [scoped] = await db.select().from(userDealerships).where(and(eq(userDealerships.userId, tech.id), eq(userDealerships.dealershipId, job.dealershipId)));
+    if (!scoped) throw new ValidationError(["Assignee must be a technician at this dealership"]);
   }
   if (patch.blocker && patch.blocker !== "none" && patch.blocker !== job.blocker && !(patch.delayReason ?? job.delayReason ?? patch.nextAction)) {
     // A blocker should always carry a reason so the delay is explainable.
@@ -498,6 +506,8 @@ export async function logLabour(db: DB, actor: Actor, jobId: string, input: { ho
   if (!(input.hours > 0 && input.hours <= 16)) throw new ValidationError(["Hours must be between 0 and 16"]);
   const workDate = input.workDate ?? businessDate();
   if (workDate > businessDate()) throw new ValidationError(["Work date cannot be in the future"]);
+  if (workDate < businessDate(job.openedAt)) throw new ValidationError(["Work date cannot be before the job was opened"]);
+  if (workDate < addDays(businessDate(), -LABOUR_BACKDATE_DAYS)) throw new ValidationError([`Labour older than ${LABOUR_BACKDATE_DAYS} days can't be added — ask your manager`]);
   const resourceType = job.jobType === "service" ? "service_bay" : job.commonStage === "painting" ? "paint_booth" : "body_bay";
   const [l] = await db
     .insert(labourLogs)

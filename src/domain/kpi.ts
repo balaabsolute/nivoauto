@@ -70,10 +70,10 @@ export interface JobRecord {
 }
 
 export const AGEING_BUCKETS = [
-  { key: "0-1d", label: "≤1 day", maxDays: 1 },
-  { key: "2-3d", label: "2–3 days", maxDays: 3 },
-  { key: "4-7d", label: "4–7 days", maxDays: 7 },
-  { key: "8d+", label: "8+ days", maxDays: Infinity },
+  { key: "0-1d", label: "Up to 1 day", maxDays: 1 },
+  { key: "2-3d", label: "1–3 days", maxDays: 3 },
+  { key: "4-7d", label: "3–7 days", maxDays: 7 },
+  { key: "8d+", label: "Over 7 days", maxDays: Infinity },
 ] as const;
 export type AgeingKey = (typeof AGEING_BUCKETS)[number]["key"];
 

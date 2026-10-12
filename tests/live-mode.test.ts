@@ -30,7 +30,14 @@ describe("live mode separates demo data", () => {
       { ...base, dealershipId: demo.id, legalEntityId: leD.id, brandId: b.id, revenueAmount: 999_999, sourceRef: "d1", isDemo: true },
     ]);
     const md = { id: "00000000-0000-0000-0000-000000000000", role: "md" as const, dealershipIds: [], name: "MD", email: "md@x" };
-    return { db, seedDemo, assertDemoAllowed, buildDashboard, listJobs, resolvePeriod, businessDate, y, md };
+    const { hashPassword } = await import("@/server/password");
+    const pw = await hashPassword("correct-horse-battery");
+    await db.insert(s.users).values([
+      { email: "demo-md@x.local", name: "Demo MD", role: "md", passwordHash: pw, isDemo: true },
+      { email: "real-md@x.local", name: "Real MD", role: "md", passwordHash: pw },
+    ]);
+    const { login } = await import("@/server/session");
+    return { login, db, seedDemo, assertDemoAllowed, buildDashboard, listJobs, resolvePeriod, businessDate, y, md };
   }
   beforeAll(async () => {
     ctx = await setup();
@@ -39,6 +46,11 @@ describe("live mode separates demo data", () => {
   it("refuses to seed demo data", async () => {
     expect(() => ctx.assertDemoAllowed()).toThrow(/DATA_MODE=live/);
     await expect(ctx.seedDemo(ctx.db)).rejects.toThrow(/DATA_MODE=live/);
+  });
+
+  it("demo accounts cannot sign in against live data", async () => {
+    expect(await ctx.login(ctx.db, "demo-md@x.local", "correct-horse-battery")).toBeNull();
+    expect((await ctx.login(ctx.db, "real-md@x.local", "correct-horse-battery"))?.actor.role).toBe("md");
   });
 
   it("dashboards show only real dealerships and real records", async () => {

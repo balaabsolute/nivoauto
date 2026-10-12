@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { DB } from "@/db/client";
 import { dailyReports, dealerships, alerts, users, userDealerships } from "@/db/schema";
-import { assertCan, assertDealership, can, dealershipScope, ForbiddenError } from "@/domain/permissions";
+import { assertCan, assertDealership, can, dealershipScope, isGroupWide, ForbiddenError } from "@/domain/permissions";
 import { businessDate, isIsoDate, addDays } from "@/domain/periods";
 import type { Actor } from "../principal";
 import { audit } from "../audit";
@@ -82,7 +82,7 @@ export async function reportStatusForDate(db: DB, actor: Actor, date: string) {
     .where(and(eq(dealerships.active, true), demoFilter(dealerships.isDemo), scope === "all" ? undefined : scope.length ? inArray(dealerships.id, scope) : sql`false`))
     .orderBy(asc(dealerships.name));
   const reps = ds.length
-    ? await db.select({ r: dailyReports, by: users.name }).from(dailyReports).leftJoin(users, eq(users.id, dailyReports.submittedById)).where(and(eq(dailyReports.businessDate, date), inArray(dailyReports.dealershipId, ds.map((d) => d.id))))
+    ? await db.select({ r: dailyReports, by: users.name }).from(dailyReports).leftJoin(users, eq(users.id, dailyReports.submittedById)).where(and(eq(dailyReports.businessDate, date), inArray(dailyReports.dealershipId, ds.map((d) => d.id)), demoFilter(dailyReports.isDemo)))
     : [];
   return ds.map((d) => ({ dealer: d, report: reps.find((x) => x.r.dealershipId === d.id) ?? null }));
 }
@@ -104,12 +104,13 @@ export async function updateAlert(db: DB, actor: Actor, alertId: string, raw: z.
   const [a] = await db.select().from(alerts).where(eq(alerts.id, alertId));
   if (!a) throw new NotFoundError("Alert not found");
   if (a.dealershipId) assertDealership(actor, a.dealershipId);
+  else if (!isGroupWide(actor)) throw new ForbiddenError("Group-level actions can only be updated by group leadership");
   if ((patch.status === "resolved" || patch.status === "dismissed") && !(patch.resolutionNote ?? a.resolutionNote)) {
     throw new ValidationError(["Add a note describing the action taken or why the alert is dismissed"]);
   }
   if (patch.ownerId) {
-    const [u] = await db.select().from(users).where(eq(users.id, patch.ownerId));
-    if (!u || !u.active) throw new ValidationError(["Owner must be an active user"]);
+    const allowed = await alertOwnerOptions(db, actor, a.dealershipId);
+    if (!allowed.some((o) => o.id === patch.ownerId)) throw new ValidationError(["Owner must be group leadership or a manager/advisor at this dealership"]);
   }
   const [row] = await db.update(alerts).set(patch).where(eq(alerts.id, alertId)).returning();
   await audit(db, { userId: actor.id, action: "alert.update", entityType: "alert", entityId: alertId, dealershipId: a.dealershipId, before: { status: a.status, ownerId: a.ownerId, dueDate: a.dueDate }, after: patch });

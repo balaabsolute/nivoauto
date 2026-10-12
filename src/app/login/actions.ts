@@ -35,7 +35,7 @@ export async function loginAction(_prev: { error?: string } | undefined, form: F
     expires: res.expiresAt,
   });
   await audit(db, { userId: res.actor.id, action: "auth.login", entityType: "user", entityId: res.actor.id });
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : homePathFor(res.actor));
+  redirect(/^\/(?![\/\\])/.test(next) && !next.includes("\\") ? next : homePathFor(res.actor));
 }
 
 export async function logoutAction() {

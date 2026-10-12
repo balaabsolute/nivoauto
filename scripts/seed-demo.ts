@@ -3,7 +3,8 @@ import { getDb } from "../src/db/client";
 import { seedDemo, DEMO_PASSWORD, removeDemoData, assertDemoAllowed } from "../src/db/seed-demo";
 
 async function main() {
-  assertDemoAllowed();
+  // Removing demo data is always allowed; loading it is guarded.
+  if (!process.argv.includes("--remove")) assertDemoAllowed();
   const db = await getDb();
   if (process.env.DATABASE_URL) {
     const { migrate } = await import("drizzle-orm/node-postgres/migrator");

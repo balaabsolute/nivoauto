@@ -172,7 +172,7 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
   const dealers = await db
     .insert(s.dealerships)
     .values(PROFILES.map((p) => ({
-      code: p.code, name: `Kun ${p.brand}`, brandId: allBrands.find((b) => b.name === p.brand)!.id, legalEntityId: entityBy(p.entity).id,
+      code: p.code, name: `Kun ${p.brand} (demo)`, brandId: allBrands.find((b) => b.name === p.brand)!.id, legalEntityId: entityBy(p.entity).id,
       locationName: "Location TBC", city: null, hasSales: true, hasService: true, hasBodyShop: p.bodyShop, isDemo: true,
     })))
     .returning();

@@ -104,8 +104,8 @@ export function Notice({ tone = "info", children, title }: { tone?: "info" | "wa
 
 export function DemoBanner() {
   return (
-    <div className="no-print relative">
-      <div className="hazard-tape h-1.5" aria-hidden />
+    <div className="relative">
+      <div className="hazard-tape h-1.5 print:hidden" aria-hidden />
       <div className="bg-ink text-white text-[13px] px-4 py-1.5 flex flex-wrap items-center gap-x-2">
         <strong className="font-semibold text-hazard">Demo data</strong>
         <span className="text-white/85">Every figure shown is synthetic and illustrative — not Kun Automobile data.</span>

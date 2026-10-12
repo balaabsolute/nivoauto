@@ -13,7 +13,7 @@ import {
 } from "@/domain/periods";
 import { summariseRevenue, CATEGORY_ORDER, type RevenueSummary, type RevenueLine, round2 } from "@/domain/revenue";
 import {
-  jobKpis, wipByStage, availableHours, utilisationPct, targetForPeriod, growthPct, targetAchievementPct, appointmentKpis, averagePerJob, isOverdue, ageDays, pct,
+  jobKpis, wipByStage, isOpenAt as isOpenAtFn, availableHours, utilisationPct, targetForPeriod, growthPct, targetAchievementPct, appointmentKpis, averagePerJob, isOverdue, ageDays, pct,
   type JobKpis, type JobRecord, type MonthlyTarget,
 } from "@/domain/kpi";
 import { SERVICE_COMMON_STAGES, BODYSHOP_COMMON_STAGES } from "@/domain/workflow";
@@ -146,7 +146,7 @@ export async function loadDealers(db: DB, ids: "all" | string[]): Promise<Dealer
 
 interface Raw {
   txns: (RevenueLine & { dealershipId: string; businessDate: string; jobId: string | null; createdAt: Date })[];
-  jobs: (JobRecord & { updatedAt: Date; jobNo: string })[];
+  jobs: (JobRecord & { updatedAt: Date; jobNo: string; stageEnteredAt: Date })[];
   parts: { jobId: string; status: string; issuedAt: Date | null }[];
   labour: { dealershipId: string; resourceType: string; workDate: string; hours: number }[];
   capacity: { dealershipId: string; resourceType: string; physicalUnits: number; productiveHoursPerUnitPerDay: number; workingDays: string }[];
@@ -316,7 +316,8 @@ function computeUnit(raw: Raw, dealerIds: string[], dealersInfo: DealerInfo[], p
     openJobsWithoutPromise: jb.filter((j) => j.status === "open" && !j.promisedAt).length,
     dailyReportsSubmitted: reportsSubmitted,
     dailyReportsExpected: reportsExpected,
-    hasAnyData: tx.length > 0 || jb.length > 0 || reps.length > 0,
+    // "Reporting" = any record inside the selected period (not the comparison/trend window).
+    hasAnyData: cur.length > 0 || jb.some((j) => (j.openedAt >= inst.from && j.openedAt < inst.to) || (j.deliveredAt && j.deliveredAt >= inst.from && j.deliveredAt < inst.to) || isOpenAtFn(j, asOf)) || reps.length > 0,
   };
 
   return {
@@ -421,7 +422,7 @@ function alertPeriodKey(p: Period): string {
 function signalsFor(d: DealerInfo, m: UnitMetrics, raw: Raw, period: Period, asOf: Date, today: string) {
   const open = raw.jobs.filter((j) => j.dealershipId === d.id && isOverdue(j, asOf));
   const oldest = open.length ? Math.max(...open.map((j) => ageDays((j.promisedAt ?? j.expectedCompletionAt)!, asOf))) : null;
-  const waitingApproval = raw.jobs.filter((j) => j.dealershipId === d.id && j.status === "open" && (j.approvalStatus === "pending" || j.blocker === "insurer_approval" || j.blocker === "customer_approval") && ageDays(j.openedAt, asOf) > ALERT_THRESHOLDS.approvalWaitDays).length;
+  const waitingApproval = raw.jobs.filter((j) => j.dealershipId === d.id && j.status === "open" && (j.approvalStatus === "pending" || j.blocker === "insurer_approval" || j.blocker === "customer_approval") && ageDays(j.stageEnteredAt, asOf) > ALERT_THRESHOLDS.approvalWaitDays).length; // time waiting in the current stage
   const gpOk = (g: RevenueSummary["gp"]) => (g.status === "complete" || g.status === "provisional" ? g.marginPct : null);
   // Missing daily reports: the last 3 days before today inside the period (keeps the signal actionable).
   const missing: string[] = [];

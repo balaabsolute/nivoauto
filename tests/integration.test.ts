@@ -24,6 +24,7 @@ import { ValidationError, ConflictError } from "@/server/errors";
 import { defaultStages } from "@/domain/workflow";
 
 let db: DB;
+let regSeq = 1000;
 const ids: Record<string, string> = {};
 const actors: Record<string, Actor> = {};
 const sent: { channel: string; body: string }[] = [];
@@ -84,7 +85,7 @@ const newJob = (over: Partial<Parameters<typeof createJob>[2]> = {}) =>
     jobType: "service",
     customerName: "Test Customer",
     phone: "9876543210",
-    registrationNo: `tn 01 ab ${Math.floor(Math.random() * 9000 + 1000)}`,
+    registrationNo: `tn 01 ab ${String(++regSeq).padStart(4, "0")}`,
     consentWhatsapp: true,
     preferredChannel: "whatsapp",
     complaint: "Periodic service",
@@ -274,6 +275,24 @@ describe("permissions & entity boundaries", () => {
     await expect(updateJob(db, actors.techA2, job.id, { estimateAmount: 1 })).rejects.toBeInstanceOf(ForbiddenError);
   });
 
+  it("technicians can report a blocker but not clear one; assignees must work at the dealership", async () => {
+    const job = await newJob();
+    await updateJob(db, actors.advA, job.id, { assignedToId: ids.techA });
+    await updateJob(db, actors.techA, job.id, { blocker: "parts", delayReason: "Pads out of stock" });
+    await expect(updateJob(db, actors.techA, job.id, { blocker: "none" })).rejects.toBeInstanceOf(ForbiddenError);
+    await updateJob(db, actors.advA, job.id, { blocker: "none" });
+    const [otherTech] = await db.insert(s.users).values({ email: "techB@t.local", name: "techB", role: "technician", passwordHash: "x" }).returning();
+    await db.insert(s.userDealerships).values({ userId: otherTech.id, dealershipId: ids.d2 });
+    await expect(updateJob(db, actors.advA, job.id, { assignedToId: otherTech.id })).rejects.toThrow(/at this dealership/);
+  });
+
+  it("labour cannot be logged before the job opened or long after the fact", async () => {
+    const job = await newJob();
+    await updateJob(db, actors.advA, job.id, { assignedToId: ids.techA });
+    await expect(logLabour(db, actors.techA, job.id, { hours: 1, workDate: addDays(businessDate(), -3) })).rejects.toThrow(/before the job was opened/);
+    await logLabour(db, actors.techA, job.id, { hours: 1 });
+  });
+
   it("dashboards: MD sees all dealerships; a manager only theirs; an advisor none", async () => {
     const p = resolvePeriod("mtd", businessDate());
     const g = await buildDashboard(db, actors.md, p, { requires: "group.dashboard" });
@@ -395,6 +414,7 @@ describe("finance: entry, import, double counting, periods", () => {
 
     // Utilisation: 2 bays × 5 h = 10 h available yesterday; log 6 h → 60%
     const job = await newJob({ registrationNo: "UT01AA0001" });
+    await db.update(s.jobs).set({ openedAt: new Date(Date.now() - 36 * 3600_000) }).where(eq(s.jobs.id, job.id)); // opened yesterday
     await updateJob(db, actors.advA, job.id, { assignedToId: ids.techA });
     await logLabour(db, actors.advA, job.id, { hours: 6, workDate: yesterday });
     d = await buildDashboard(db, actors.md, yp, { requires: "group.dashboard", syncAlerts: false });

@@ -4,6 +4,7 @@ import type { DB } from "@/db/client";
 import { sessions, users } from "@/db/schema";
 import { verifyPassword } from "./password";
 import { loadActor, type Actor } from "./principal";
+import { DATA_MODE } from "./data-mode";
 
 export const SESSION_COOKIE = "kun_session";
 export const SESSION_TTL_HOURS = Number(process.env.SESSION_TTL_HOURS ?? 12);
@@ -15,6 +16,7 @@ export async function login(db: DB, email: string, password: string): Promise<{ 
   // Always run a verify to keep timing similar for unknown users.
   const ok = await verifyPassword(password, u?.passwordHash ?? "scrypt$AAAAAAAAAAAAAAAAAAAAAA==$AAAA");
   if (!u || !u.active || !ok) return null;
+  if (DATA_MODE === "live" && u.isDemo) return null;
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 3_600_000);
   await db.insert(sessions).values({ id: sha(token), userId: u.id, expiresAt });

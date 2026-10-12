@@ -127,8 +127,8 @@ export async function saveDealership(db: DB, actor: Actor, raw: z.input<typeof d
     const [before] = await db.select().from(dealerships).where(eq(dealerships.id, id));
     if (!before) throw new NotFoundError();
     if (before.legalEntityId !== values.legalEntityId) {
-      const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(jobs).where(eq(jobs.dealershipId, id));
-      if (n > 0) throw new ValidationError(["Legal entity cannot be changed once records exist (transactions retain their original entity)"]);
+      const [{ n }] = await db.select({ n: sql<number>`(select count(*) from jobs where dealership_id = ${id}) + (select count(*) from transactions where dealership_id = ${id}) + (select count(*) from customers where dealership_id = ${id})` }).from(sql`(select 1) as one`);
+      if (Number(n) > 0) throw new ValidationError(["Legal entity cannot be changed once records exist (transactions retain their original entity)"]);
     }
     const [row] = await db.update(dealerships).set(values).where(eq(dealerships.id, id)).returning();
     await audit(db, { userId: actor.id, action: "dealership.update", entityType: "dealership", entityId: id, dealershipId: id, before, after: row });
@@ -182,12 +182,19 @@ export async function saveStageConfig(db: DB, actor: Actor, dealershipId: string
     const tx = txRaw as unknown as DB;
     const before = await listStageConfig(tx, dealershipId, jobType);
     // Open jobs must still find their current stage.
+    // Open jobs must still find their current stage: for a location, its own jobs; for the group
+    // default, jobs at every location that has no override of its own.
+    const overridden = dealershipId ? [] : (await tx.selectDistinct({ d: workflowStages.dealershipId }).from(workflowStages).where(and(eq(workflowStages.jobType, jobType), sql`${workflowStages.dealershipId} is not null`))).map((r) => r.d!);
     const openStages = await tx
       .selectDistinct({ code: jobs.stageCode })
       .from(jobs)
-      .where(and(eq(jobs.status, "open"), eq(jobs.jobType, jobType), dealershipId ? eq(jobs.dealershipId, dealershipId) : sql`true`));
+      .where(and(
+        eq(jobs.status, "open"),
+        eq(jobs.jobType, jobType),
+        dealershipId ? eq(jobs.dealershipId, dealershipId) : overridden.length ? sql`${jobs.dealershipId} not in (${sql.join(overridden.map((o) => sql`${o}`), sql`, `)})` : sql`true`,
+      ));
     const missing = openStages.filter((o) => !defs.some((d) => d.code === o.code));
-    if (missing.length && dealershipId) throw new ValidationError([`Open jobs are in stage(s) ${missing.map((m) => m.code).join(", ")} — keep those stage codes`]);
+    if (missing.length) throw new ValidationError([`Open jobs are in stage(s) ${missing.map((m) => m.code).join(", ")}. Keep those stage codes until the jobs move on.`]);
     await tx.delete(workflowStages).where(and(eq(workflowStages.jobType, jobType), dealershipId ? eq(workflowStages.dealershipId, dealershipId) : sql`${workflowStages.dealershipId} is null`));
     await tx.insert(workflowStages).values(defs.map((d) => ({ ...d, dealershipId, jobType })));
     await audit(tx, { userId: actor.id, action: "workflow.update", entityType: "workflow_stages", entityId: `${dealershipId ?? "group"}:${jobType}`, dealershipId, before, after: defs });
