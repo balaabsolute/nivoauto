@@ -1,0 +1,49 @@
+{
+  "name": "kun-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Kun Automobile — Group Intelligence & Digital Operations Platform (Phase 1 MVP)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed-demo": "tsx scripts/seed-demo.ts",
+    "db:reset-demo": "tsx scripts/seed-demo.ts --reset",
+    "user:create": "tsx scripts/create-user.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "engines": {
+    "node": ">=20.18"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.7",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.44.7",
+    "next": "^15.5.27",
+    "pg": "^8.16.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "recharts": "^2.15.4",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.18.6",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "autoprefixer": "^10.4.21",
+    "drizzle-kit": "^0.31.4",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
