@@ -21,7 +21,7 @@ export default async function DevicePage() {
         <form action="/logout" method="post"><button className="w-full rounded-2xl border-2 border-white/40 px-8 py-6 text-[clamp(18px,1.8vw,32px)]">Sign this device out</button></form>
       </div>
       <p className="mt-[5vh] text-white/60 max-w-[60ch] text-[clamp(13px,1.05vw,20px)]">
-        Tip: open this site in the browser&apos;s full-screen / kiosk mode (Android “Screen pinning”, Chrome kiosk mode, or “Add to Home screen”). To reach this menu again, tap the top-right corner five times.
+        Tip: open this site in the browser&apos;s full-screen / kiosk mode (Android “Screen pinning”, Chrome kiosk mode, or “Add to Home screen”). To reach this menu again, press and hold the small lock icon in the bottom-left corner of the kiosk screen.
       </p>
     </div>
   );

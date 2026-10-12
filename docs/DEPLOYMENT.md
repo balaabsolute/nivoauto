@@ -67,8 +67,8 @@ under **Finance & targets → Targets**.
    they can't read customer records.
 4. Put the browser in full-screen / kiosk mode: Android *Screen pinning* or *Add to Home screen* (the app
    ships a web manifest), or Chrome with `--kiosk https://<host>/kiosk`.
-5. To switch a device to the lounge feedback screen, tap the top-right corner five times to open the staff
-   device menu, then choose *Lounge screen*. The same menu signs the device out.
+5. To switch a device to the lounge feedback screen or sign it out, press and hold the small lock icon in
+   the bottom-left corner for 1.5 seconds (or tap it five times) to open the staff device menu.
 6. Screens reset automatically after inactivity so the next customer never sees earlier entries.
 
 Sales consultants (role **Sales consultant**) work enquiries and follow-ups; dealership managers also
