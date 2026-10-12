@@ -9,7 +9,7 @@ import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import { DealerTable } from "@/components/dashboard/DealerTable";
 import {
-  HeadlineFigures, RevenueMixPanel, PipelinePanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, toTableRows, BODYSHOP_COMMON_STAGES,
+  HeadlineFigures, RevenueMixPanel, PipelinePanel, ShowroomPanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, toTableRows, BODYSHOP_COMMON_STAGES,
 } from "@/components/dashboard/sections";
 
 export const metadata = { title: "Group overview" };
@@ -63,6 +63,7 @@ export default async function GroupPage({ searchParams }: { searchParams: Promis
             <OperationalHealthPanel m={d.total} />
             <div className="space-y-4">
               <PipelinePanel m={d.total} />
+              <ShowroomPanel m={d.total} />
               <StageQueue wip={d.total.bodyshopWip} stages={BODYSHOP_COMMON_STAGES} title="Body shop stage queue" subtitle="Vehicles in each stage now" href="/bodyshop" />
             </div>
           </div>

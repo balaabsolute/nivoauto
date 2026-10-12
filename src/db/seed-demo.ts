@@ -19,6 +19,7 @@ import { addDays, businessDate, eachDay, eachMonth, fyStart, zonedMidnight, days
 import { hashPassword } from "@/server/password";
 import { renderTemplate } from "@/domain/notifications";
 import { SERVICE_CHECKLIST, BODYSHOP_CHECKLIST } from "@/server/services/jobs";
+import { seedCrmDemo } from "./seed-crm";
 
 export { DEMO_PASSWORD } from "./demo-constants";
 import { DEMO_PASSWORD } from "./demo-constants";
@@ -101,6 +102,14 @@ export async function removeDemoData(db: DB) {
   const demoOr = (flag: Parameters<typeof eq>[0], dealerCol: Parameters<typeof inArray>[0]) => or(eq(flag, true), inDealers(dealerCol));
   await db.delete(s.alerts).where(inDealers(s.alerts.dealershipId));
   await db.delete(s.notifications).where(demoOr(s.notifications.isDemo, s.notifications.dealershipId));
+  // Showroom CRM (lead children cascade with the lead)
+  await db.delete(s.loungeFeedback).where(demoOr(s.loungeFeedback.isDemo, s.loungeFeedback.dealershipId));
+  await db.delete(s.walkIns).where(demoOr(s.walkIns.isDemo, s.walkIns.dealershipId));
+  const demoLeads = db.select({ id: s.leads.id }).from(s.leads).where(demoOr(s.leads.isDemo, s.leads.dealershipId));
+  await db.delete(s.followUps).where(inArray(s.followUps.leadId, demoLeads));
+  await db.delete(s.leads).where(demoOr(s.leads.isDemo, s.leads.dealershipId));
+  const demoModels = db.select({ id: s.carModels.id }).from(s.carModels).where(eq(s.carModels.isDemo, true));
+  await db.delete(s.modelUpdates).where(or(eq(s.modelUpdates.isDemo, true), inDealers(s.modelUpdates.dealershipId), inArray(s.modelUpdates.modelId, demoModels)));
   await db.delete(s.transactions).where(demoOr(s.transactions.isDemo, s.transactions.dealershipId));
   await db.delete(s.labourLogs).where(demoOr(s.labourLogs.isDemo, s.labourLogs.dealershipId));
   await db.update(s.appointments).set({ jobId: null }).where(demoOr(s.appointments.isDemo, s.appointments.dealershipId));
@@ -125,10 +134,21 @@ export async function removeDemoData(db: DB) {
     await db.update(s.dailyReports).set({ submittedById: null }).where(inArray(s.dailyReports.submittedById, demoUsers));
     await db.update(s.jobPhotos).set({ uploadedById: null }).where(inArray(s.jobPhotos.uploadedById, demoUsers));
     await db.update(s.labourLogs).set({ technicianId: null }).where(inArray(s.labourLogs.technicianId, demoUsers));
+    await db.update(s.leads).set({ consultantId: null }).where(inArray(s.leads.consultantId, demoUsers));
+    await db.update(s.leads).set({ createdById: null }).where(inArray(s.leads.createdById, demoUsers));
+    await db.update(s.walkIns).set({ attendedById: null }).where(inArray(s.walkIns.attendedById, demoUsers));
+    await db.update(s.walkIns).set({ kioskUserId: null }).where(inArray(s.walkIns.kioskUserId, demoUsers));
+    await db.update(s.loungeFeedback).set({ kioskUserId: null }).where(inArray(s.loungeFeedback.kioskUserId, demoUsers));
+    await db.update(s.testDrives).set({ consultantId: null }).where(inArray(s.testDrives.consultantId, demoUsers));
+    await db.update(s.leadActivities).set({ userId: null }).where(inArray(s.leadActivities.userId, demoUsers));
+    await db.update(s.followUps).set({ assignedToId: null }).where(inArray(s.followUps.assignedToId, demoUsers));
+    await db.update(s.followUps).set({ completedById: null }).where(inArray(s.followUps.completedById, demoUsers));
+    await db.update(s.modelUpdates).set({ createdById: null }).where(inArray(s.modelUpdates.createdById, demoUsers));
     await db.delete(s.importBatches).where(inArray(s.importBatches.createdById, demoUsers));
     await db.delete(s.auditLog).where(or(inArray(s.auditLog.userId, demoUsers), inDealers(s.auditLog.dealershipId)));
   }
   await db.delete(s.users).where(eq(s.users.isDemo, true));
+  await db.delete(s.carModels).where(eq(s.carModels.isDemo, true));
   await db.delete(s.dealerships).where(eq(s.dealerships.isDemo, true));
   await db.delete(s.brands).where(eq(s.brands.isDemo, true));
   await db.delete(s.legalEntities).where(eq(s.legalEntities.isDemo, true));
@@ -201,6 +221,9 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
     userRows.push(mkUser(`advisor.${c}@demo.kun.local`, `Demo Advisor — ${p.brand}`, "service_advisor"));
     const techs = p.serviceJobsPerDay > 5 ? 3 : 2;
     for (let i = 1; i <= techs; i++) userRows.push(mkUser(`tech${i}.${c}@demo.kun.local`, `Demo Technician ${i} — ${p.brand}`, "technician"));
+    const sales = p.code === "RR" ? 1 : 2;
+    for (let i = 1; i <= sales; i++) userRows.push(mkUser(`sales${i}.${c}@demo.kun.local`, `Demo Sales Consultant ${i} — ${p.brand}`, "sales_consultant"));
+    userRows.push(mkUser(`kiosk.${c}@demo.kun.local`, `Demo Kiosk — ${p.brand} showroom`, "kiosk"));
   }
   const users = await db.insert(s.users).values(userRows).returning();
   const scopeRows: { userId: string; dealershipId: string }[] = [];
@@ -535,8 +558,11 @@ export async function seedDemo(db: DB, opts: { now?: Date; log?: (m: string) => 
   await insertChunked(db, s.appointments, apptRows, 1000);
   await insertChunked(db, s.notifications, notifRows, 1000);
 
+  log("showroom CRM");
+  const crm = await seedCrmDemo(db, { now, profiles: PROFILES, dealers, brands: allBrands, users, scopeRows, customers, vehicles, staleCutoff });
+
   log("done");
-  return { dealerships: dealers.length, users: users.length, jobs: jobRows.length, transactions: txnRows.length, appointments: apptRows.length, notifications: notifRows.length };
+  return { dealerships: dealers.length, users: users.length, jobs: jobRows.length, transactions: txnRows.length, appointments: apptRows.length, notifications: notifRows.length, ...crm };
 }
 
 export { SERVICE_COMMON_STAGES, BODYSHOP_COMMON_STAGES };

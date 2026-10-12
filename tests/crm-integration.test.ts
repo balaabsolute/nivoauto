@@ -239,6 +239,15 @@ describe("nurture: model updates", () => {
 });
 
 describe("lounge feedback → future prospects", () => {
+  it("lounge feedback without marketing consent leaves existing service-update consent untouched", async () => {
+    const p = phone();
+    await captureVisit(db, A.kioskA, { visitType: "spare_parts", name: "Existing", phone: p, consentWhatsapp: true, request: "Mats" });
+    await submitLoungeFeedback(db, A.kioskA, { name: "Existing", phone: p, consentMarketing: false, interest: "maybe", purchaseYear: 2019 });
+    const [c] = await db.select().from(s.customers).where(eq(s.customers.phone, `+91${p}`));
+    expect(c.consentWhatsapp).toBe(true);
+    expect(c.consentMarketing).toBe(false);
+  });
+
   it("any lounge customer can respond; 5+ year cars are tagged; prospects can be nurtured and converted cross-brand", async () => {
     const thisYear = Number(businessDate().slice(0, 4));
     const pPhone = phone();

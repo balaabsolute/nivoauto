@@ -13,7 +13,7 @@ import { PageHeader, Panel, Chip, EmptyState, ProgressBar } from "@/components/u
 import { PeriodSelector } from "@/components/dashboard/PeriodSelector";
 import { TrendChart } from "@/components/dashboard/TrendChart";
 import {
-  HeadlineFigures, RevenueMixPanel, PipelinePanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, BodyShopPanel, BODYSHOP_COMMON_STAGES, SERVICE_COMMON_STAGES,
+  HeadlineFigures, RevenueMixPanel, PipelinePanel, ShowroomPanel, OperationalHealthPanel, StageQueue, InsightsPanel, FreshnessStrip, BodyShopPanel, BODYSHOP_COMMON_STAGES, SERVICE_COMMON_STAGES,
 } from "@/components/dashboard/sections";
 
 export const metadata = { title: "Dealership" };
@@ -70,7 +70,12 @@ export default async function DealershipPage({ params, searchParams }: { params:
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
           <InsightsPanel alerts={row.alerts} showDealer={false} />
           <OperationalHealthPanel m={m} hasBodyShop={dealer.hasBodyShop} />
-          {dealer.hasSales && <PipelinePanel m={m} />}
+          {dealer.hasSales && (
+            <div className="space-y-4">
+              <PipelinePanel m={m} />
+              <ShowroomPanel m={m} href={`/leads?dealer=${id}&status=all`} />
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">

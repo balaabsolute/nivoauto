@@ -3,6 +3,7 @@ import clsx from "clsx";
 const TABS = [
   { href: "/admin", label: "Users & access" },
   { href: "/admin/dealerships", label: "Entities & dealerships" },
+  { href: "/admin/models", label: "Car models" },
   { href: "/admin/workflow", label: "Workflow stages" },
   { href: "/admin/capacity", label: "Capacity" },
   { href: "/admin/audit", label: "Audit trail" },

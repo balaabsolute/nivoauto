@@ -24,7 +24,7 @@ Source of truth: `src/db/schema.ts` (Drizzle, PostgreSQL). Migrations: `./drizzl
 |---|---|
 | `legal_entities`, `brands`, `dealerships` | Master data |
 | `users`, `user_dealerships`, `sessions` | Accounts, dealership scope for location-bound roles, hashed session tokens |
-| `customers`, `vehicles` | Customer (per legal entity) with channel consent + timestamp; vehicles by normalised registration |
+| `customers`, `vehicles` | Customer (per legal entity) with channel consent + timestamp, separate marketing consent and marketing opt-out; vehicles by normalised registration |
 | `workflow_stages` | Stage configuration: group default (`dealership_id` NULL) or per location; each stage maps to a **common stage** |
 | `jobs` | Service and body shop jobs: stage, status, assignment, estimate/approval, insurer, blocker, delay reason, next action, promised/expected times, invoice/payment, comeback flag, optimistic-lock `version` |
 | `job_checklist_items`, `job_parts`, `job_photos`, `labour_logs`, `job_events` | Job card detail and timeline |
@@ -36,6 +36,12 @@ Source of truth: `src/db/schema.ts` (Drizzle, PostgreSQL). Migrations: `./drizzl
 | `daily_reports` | Dealership daily pipeline figures (leads, bookings, cancellations, expected deliveries), capacity override, notes |
 | `alerts` | Management actions: rule, fingerprint (rule + dealership + period), evidence, owner, due date, status |
 | `notifications` | Customer messages: event, de-dupe key, channel, recipient, body, status, attempts, provider ref, errors |
+| `car_models` | Catalogue per brand (body type, fuel, optional display price band); drives kiosk and enquiry choices |
+| `walk_ins` | Front-desk visit: type, token, captured via kiosk/staff, status, attended by, link to enquiry or job |
+| `leads` | New-car enquiry: number, source, consultant, stage (enquiry → test drive → negotiation → booked), status (open / won / bought elsewhere / not interested / opted out), timeframe, budget, exchange, next follow-up, loss details |
+| `lead_interests`, `test_drives`, `lead_activities`, `follow_ups` | Models of interest, test drives (licence check, rating), timeline, follow-up tasks (incl. tasks raised by a model update) |
+| `model_updates` | Nurture broadcasts about a model: type, title, message, audience counts |
+| `lounge_feedback` | Lounge survey: current car, purchase year, interest, timeframe, budget, preferred models; prospect status and converted enquiry |
 | `audit_log` | Append-only audit records |
 | `app_settings` | Reserved key/value settings |
 

@@ -20,6 +20,20 @@ workshop, informs the group dashboard and triggers customer updates.
 | 7. Customer notification hooks | event-triggered, consent-aware, logged, retryable (`/notifications`); provider adapter |
 | 8. Labelled demo dataset | `npm run db:seed-demo` |
 
+**Showroom & sales (CRM) module**
+
+| Capability | Where |
+|---|---|
+| Showroom kiosk on a touch TV or tablet: four visit types (new-car enquiry, service, spare parts, body shop), cars of interest, test-drive request, consent, queue token | `/kiosk` (kiosk device account) |
+| Lounge feedback kiosk for every waiting customer: current car and purchase year, interest, timeframe, budget, preferences | `/kiosk/lounge` |
+| Front-desk queue (waiting, attending, closed); open a job card from a service or body-shop visit | `/front-desk` |
+| Enquiries: consultant assignment, details, test drives (licence check), follow-ups, contact log, timeline, messages | `/leads`, `/leads/[id]` |
+| Outcomes that stop nurture: sold, bought elsewhere (brand/model/dealer, can be a different car), not interested, opted out | enquiry page → *Close enquiry* |
+| Nurture: model updates sent to open enquiries for that model (consent-aware), with a call task per consultant | `/leads/updates` |
+| Future prospects from lounge feedback, tagged when the car is 5+ years old; convert to an enquiry at any group dealership | `/prospects` |
+| Showroom funnel on group and dealership dashboards | `/group`, `/dealerships/[id]` |
+| Car model catalogue | `/admin/models` |
+
 Also included: appointments with check-in to a job card, manual revenue entry, validated CSV import with
 de-duplication, approved targets, reconciliation status, management actions (owner, due date, status),
 administration (users, entities, brands, dealerships, capacity, workflow stages) and an append-only audit trail.
@@ -43,6 +57,8 @@ Sign in with any demo account. The password for all of them is `demo-pass-2026`.
 | Dealership manager | `manager.bmw@demo.kun.local` (also `.hon`, `.hyu`, `.rr`, `.vw`, `.byd`) |
 | Service advisor | `advisor.bmw@demo.kun.local` (same suffixes) |
 | Technician | `tech1.bmw@demo.kun.local`, `tech2.…`, `tech3.…` |
+| Sales consultant | `sales1.hyu@demo.kun.local`, `sales2.…` (all suffixes; Rolls-Royce has one) |
+| Kiosk device (showroom + lounge) | `kiosk.hyu@demo.kun.local` (all suffixes) |
 | Administrator | `admin@demo.kun.local` |
 
 > Stop the dev server before re-running `db:seed-demo` when using the embedded database. PGlite allows
@@ -98,9 +114,9 @@ Copy `.env.example` to `.env.local` (dev) or set variables in your host. All var
 ```
 src/
   domain/      Pure, tested business rules: periods, revenue & GP rules, KPIs, workflow state machine,
-               permissions, alert rules, notification rules, formatting
+               permissions, alert rules, notification rules, showroom CRM rules (crm.ts), formatting
   db/          Drizzle schema (Postgres), client (pg or embedded PGlite), demo seed
-  server/      Services (jobs, appointments, finance, reporting, admin), analytics, auth/session,
+  server/      Services (jobs, appointments, finance, reporting, admin, crm), analytics, auth/session,
                audit, storage adapter, notification dispatcher + provider adapters
   app/         Next.js App Router pages and server actions
   components/  UI primitives, dashboard sections & charts
@@ -123,16 +139,17 @@ Further reading: [Implementation plan & status](docs/IMPLEMENTATION_PLAN.md) ·
 ## Testing
 
 ```bash
-npm test                                   # 66 unit + integration tests
+npm test                                   # 99 unit + integration tests
 npm run db:seed-demo && npm run build
 npm run start:demo &                       # or npm start with DATABASE_URL
-npm run test:e2e                           # 8 Playwright smoke tests
+npm run test:e2e                           # 11 Playwright tests (incl. kiosk → enquiry and lounge → prospect)
 ```
 
 The integration tests run the real services against an in-memory Postgres. They cover KPI formulas,
 date-period semantics, double-counting safeguards, permissions and entity boundaries, workflow
 transitions with audit history, notifications (consent, de-duplication, retry), CSV import and live-mode
-demo separation. The end-to-end suite was also run against PostgreSQL 17.
+demo separation, and the showroom CRM (kiosk capture, front desk, enquiry workflow, nurture eligibility,
+lounge → prospect → enquiry conversion, consent preservation, funnel metrics). The end-to-end suite was also run against PostgreSQL 17.
 
 ## Known limitations (Phase 1)
 

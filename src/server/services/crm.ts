@@ -14,7 +14,7 @@ import {
 import { assertCan, assertDealership, can, dealershipScope, ForbiddenError, canAccessDealership } from "@/domain/permissions";
 import {
   formatToken, validateClose, canChangeStage, nurtureBlocker, prospectMatchesModel, defaultFollowUpAt, hasMarketingPermission, isUpgradeCandidate,
-  prospectScore, VISIT_LABELS, type CloseInput, type NurtureSkip,
+  prospectScore, VISIT_LABELS, BUDGET_RANGES, type CloseInput, type NurtureSkip,
 } from "@/domain/crm";
 import { businessDate, isIsoDate } from "@/domain/periods";
 import type { Actor } from "../principal";
@@ -29,14 +29,6 @@ const txOf = (t: unknown) => t as Tx;
 
 /* ───────────────────────── Shared helpers ───────────────────────── */
 
-const BUDGET_RANGES: Record<(typeof BUDGET_BANDS)[number], [number | null, number | null]> = {
-  under_10l: [null, 1_000_000],
-  "10_15l": [1_000_000, 1_500_000],
-  "15_25l": [1_500_000, 2_500_000],
-  "25_50l": [2_500_000, 5_000_000],
-  "50l_1cr": [5_000_000, 10_000_000],
-  above_1cr: [10_000_000, null],
-};
 
 async function dealershipOr404(db: DB, id: string) {
   const [d] = await db.select().from(dealerships).where(eq(dealerships.id, id));
@@ -48,10 +40,11 @@ const contactInput = z.object({
   name: z.string().trim().min(2, "Please enter your name").max(80),
   phone: z.string().trim().refine((p) => /^(\+?91)?[6-9]\d{9}$/.test(p.replace(/[\s-]/g, "")), "Please enter a valid 10-digit mobile number"),
   email: z.string().trim().email("Please check the email address").optional().nullable().or(z.literal("")),
-  consentWhatsapp: z.boolean().default(false),
-  consentSms: z.boolean().default(false),
-  consentEmail: z.boolean().default(false),
-  consentMarketing: z.boolean().default(false),
+  // Consents are optional: a form only changes the consents it actually asked about.
+  consentWhatsapp: z.boolean().optional(),
+  consentSms: z.boolean().optional(),
+  consentEmail: z.boolean().optional(),
+  consentMarketing: z.boolean().optional(),
 });
 
 /**
@@ -62,13 +55,18 @@ const contactInput = z.object({
 async function upsertCustomerByPhone(tx: Tx, actorId: string, dealer: typeof dealerships.$inferSelect, c: z.infer<typeof contactInput>) {
   const phone = normalisePhone(c.phone)!;
   const [existing] = await tx.select().from(customers).where(and(eq(customers.phone, phone), eq(customers.legalEntityId, dealer.legalEntityId))).limit(1);
+  const asked: Partial<Record<"consentWhatsapp" | "consentSms" | "consentEmail" | "consentMarketing", boolean>> = {};
+  for (const k of ["consentWhatsapp", "consentSms", "consentEmail", "consentMarketing"] as const) if (c[k] !== undefined) asked[k] = c[k];
+  const merged = {
+    consentWhatsapp: asked.consentWhatsapp ?? existing?.consentWhatsapp ?? false,
+    consentSms: asked.consentSms ?? existing?.consentSms ?? false,
+    consentEmail: asked.consentEmail ?? existing?.consentEmail ?? false,
+    consentMarketing: asked.consentMarketing ?? existing?.consentMarketing ?? false,
+  };
   const consent = {
-    consentWhatsapp: c.consentWhatsapp,
-    consentSms: c.consentSms,
-    consentEmail: c.consentEmail,
-    consentMarketing: c.consentMarketing,
-    consentRecordedAt: new Date(),
-    preferredChannel: c.consentWhatsapp ? ("whatsapp" as const) : c.consentSms ? ("sms" as const) : c.consentEmail ? ("email" as const) : null,
+    ...merged,
+    consentRecordedAt: Object.keys(asked).length ? new Date() : existing?.consentRecordedAt ?? null,
+    preferredChannel: merged.consentWhatsapp ? ("whatsapp" as const) : merged.consentSms ? ("sms" as const) : merged.consentEmail ? ("email" as const) : null,
   };
   if (existing) {
     const patch: Partial<typeof customers.$inferInsert> = { ...consent };
@@ -133,6 +131,17 @@ export async function groupCatalogue(db: DB) {
     .orderBy(asc(brands.name), asc(carModels.sortOrder), asc(carModels.name));
 }
 
+/** Catalogue admin: every model incl. inactive. */
+export async function allCarModels(db: DB, actor: Actor) {
+  assertCan(actor, "catalogue.manage");
+  return db
+    .select({ m: carModels, brand: brands.name })
+    .from(carModels)
+    .innerJoin(brands, eq(brands.id, carModels.brandId))
+    .where(demoFilter(carModels.isDemo))
+    .orderBy(asc(brands.name), asc(carModels.sortOrder), asc(carModels.name));
+}
+
 export const carModelInput = z.object({
   id: z.string().uuid().optional(),
   brandId: z.string().uuid(),
@@ -151,7 +160,10 @@ export async function saveCarModel(db: DB, actor: Actor, raw: z.input<typeof car
   const { id, ...v } = p.data;
   const [dup] = await db.select({ id: carModels.id }).from(carModels).where(and(eq(carModels.brandId, v.brandId), eq(carModels.name, v.name)));
   if (dup && dup.id !== id) throw new ConflictError("This brand already has a model with that name");
-  const [row] = id ? await db.update(carModels).set(v).where(eq(carModels.id, id)).returning() : await db.insert(carModels).values(v).returning();
+  const [brand] = await db.select().from(brands).where(eq(brands.id, v.brandId));
+  if (!brand || (DATA_MODE === "live" && brand.isDemo)) throw new ValidationError(["Brand not found"]);
+  // Models inherit the demo flag from their brand so demo resets never touch real catalogue rows.
+  const [row] = id ? await db.update(carModels).set(v).where(eq(carModels.id, id)).returning() : await db.insert(carModels).values({ ...v, isDemo: brand.isDemo }).returning();
   await audit(db, { userId: actor.id, action: id ? "car_model.update" : "car_model.create", entityType: "car_model", entityId: row.id, after: v });
   return row;
 }

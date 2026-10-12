@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const has = req.cookies.has("kun_session");
   const { pathname } = req.nextUrl;
-  if (!has && !pathname.startsWith("/login") && !pathname.startsWith("/api/health")) {
+  if (!has && !pathname.startsWith("/login") && !pathname.startsWith("/api/health") && pathname !== "/manifest.webmanifest" && pathname !== "/icon.svg") {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
@@ -17,4 +17,4 @@ export function middleware(req: NextRequest) {
   return res;
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.svg).*)"] };

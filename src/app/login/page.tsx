@@ -14,6 +14,8 @@ const DEMO = [
   { email: "manager.bmw@demo.kun.local", label: "Manager — Kun BMW" },
   { email: "advisor.bmw@demo.kun.local", label: "Service advisor — Kun BMW" },
   { email: "tech1.bmw@demo.kun.local", label: "Technician — Kun BMW" },
+  { email: "sales1.hyu@demo.kun.local", label: "Sales consultant — Kun Hyundai" },
+  { email: "kiosk.hyu@demo.kun.local", label: "Showroom / lounge kiosk — Kun Hyundai" },
   { email: "admin@demo.kun.local", label: "Administrator" },
 ];
 

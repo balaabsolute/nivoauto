@@ -111,6 +111,29 @@ daily report** until a sales system is integrated (Phase 2). Expected deliveries
 reported figure per dealership, never summed across days. *Booking conversion* = bookings ÷ leads.
 Daily-report coverage = submitted ÷ expected reports for completed days.
 
+### 8a. Showroom funnel (`funnel()` in `src/domain/crm.ts`)
+
+Captured transactionally by the kiosk, front desk and enquiry records (separate from the daily-report
+figures above, which remain until the dealership switches over). For a period [from, to):
+
+| Measure | Rule |
+|---|---|
+| Walk-ins | Front-desk visits created in the period, by type (new car, service, spare parts, body shop) |
+| New-car enquiries | Enquiries **created** in the period (walk-in, phone, web, referral, lounge conversion) |
+| Test drives done | Test drives **completed** in the period (licence check required to complete) |
+| Test-drive rate | Enquiries created in the period that have a completed test drive ÷ enquiries created in the period |
+| Sold (won) | Enquiries **closed as won** in the period |
+| Close rate | Won ÷ all enquiries **closed** in the period (won + bought elsewhere + not interested + opted out) |
+| Open at period end | Enquiries created before the period end that were open at that moment |
+
+Nurture eligibility: an enquiry receives model updates only while **open**, and only if the customer gave
+marketing consent, has not opted out, and has a consented channel. Any closing outcome stops nurture and
+cancels open follow-ups. A *STOP* / opt-out sets the customer's marketing opt-out, which also excludes them
+from lounge-prospect updates. Service-update consent is separate and unaffected.
+
+Lounge prospects: the *upgrade due* tag means purchase year ≤ current year − 5 (`UPGRADE_AGE_YEARS`,
+default 5). Prospect ranking score combines interest, timeframe and car age (`prospectScore`).
+
 ## 9. Management alerts (`src/domain/alerts.ts`)
 
 Transparent rules, evaluated when a dashboard is viewed and stored with owner, due date, status and history.

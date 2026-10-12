@@ -63,3 +63,11 @@ export function relativeTime(d: Date | null | undefined, now = new Date()): stri
   if (h < 48) return `${h} h ago`;
   return `${Math.round(h / 24)} days ago`;
 }
+
+/** Date → value for an <input type="datetime-local">, in IST wall-clock time. */
+export function toLocalInput(d: Date | null | undefined): string {
+  if (!d) return "";
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d);
+  const g = (t: string) => p.find((x) => x.type === t)!.value;
+  return `${g("year")}-${g("month")}-${g("day")}T${g("hour")}:${g("minute")}`;
+}

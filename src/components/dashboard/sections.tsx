@@ -133,6 +133,40 @@ export function PipelinePanel({ m }: { m: UnitMetrics }) {
   );
 }
 
+/* ───────────── Showroom funnel (front desk + enquiries) ───────────── */
+
+export function ShowroomPanel({ m, href = "/leads" }: { m: UnitMetrics; href?: string }) {
+  const f = m.showroom;
+  if (!f.walkInsTotal && !f.enquiries && !f.closed && !f.openAtEnd) {
+    return (
+      <Panel title="Showroom" subtitle="Walk-ins and car enquiries">
+        <EmptyState title="No showroom activity in this period" icon="car">Walk-ins appear once the showroom kiosk or front desk is in use.</EmptyState>
+      </Panel>
+    );
+  }
+  const items: [string, React.ReactNode][] = [
+    ["Walk-ins", formatInt(f.walkInsTotal)],
+    ["New-car enquiries", formatInt(f.enquiries)],
+    ["Test drives done", formatInt(f.testDrives)],
+    ["Test-drive rate", formatPct(f.testDriveRatePct)],
+    ["Sold (won)", formatInt(f.won)],
+    ["Close rate", formatPct(f.closeRatePct)],
+  ];
+  return (
+    <Panel title="Showroom" subtitle="From the kiosk, front desk and enquiry records" actions={<Link href={href} className="text-sm text-petrol hover:underline">Enquiries</Link>}>
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {items.map(([l, v]) => (
+          <div key={l}><dt className="text-xs text-ink-2">{l}</dt><dd className="text-xl font-semibold num">{v}</dd></div>
+        ))}
+      </dl>
+      <p className="text-xs text-ink-3 mt-3 border-t border-line pt-2">
+        Visits: {f.walkIns.new_car} new car · {f.walkIns.service} service · {f.walkIns.spare_parts} parts · {f.walkIns.body_shop} body shop.
+        {" "}Closed: {f.won} sold, {f.lostOtherDealer} bought elsewhere, {f.notInterested} not interested, {f.optedOut} opted out. {f.openAtEnd} open at period end.
+      </p>
+    </Panel>
+  );
+}
+
 /* ───────────── Operational health ───────────── */
 
 export function OperationalHealthPanel({ m, hasBodyShop = true }: { m: UnitMetrics; hasBodyShop?: boolean }) {

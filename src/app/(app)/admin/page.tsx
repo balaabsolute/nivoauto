@@ -50,7 +50,7 @@ export default async function AdminUsers({ searchParams }: { searchParams: Promi
             <label className="block"><span className="label">Role</span><select name="role" defaultValue={editing?.role ?? "service_advisor"} className="field">{ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select></label>
             <fieldset><legend className="label">Dealership access (location-bound roles)</legend>
               <div className="grid grid-cols-2 gap-1 text-sm">{md.dealerships.map((d) => <label key={d.id} className="flex items-center gap-1.5"><input type="checkbox" name="dealershipIds" value={d.id} defaultChecked={editing?.dealershipIds.includes(d.id)} />{d.name}</label>)}</div>
-              <p className="text-xs text-ink-3 mt-1">MD, group finance and administrators are group-wide.</p>
+              <p className="text-xs text-ink-3 mt-1">MD, group finance and administrators are group-wide. A kiosk device gets exactly one dealership; sign it in once on the showroom tablet or TV (it stays signed in for 30 days).</p>
             </fieldset>
             <label className="block"><span className="label">{editing ? "New password (leave blank to keep)" : "Initial password"}</span><input name="password" type="password" autoComplete="new-password" minLength={10} className="field" /></label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="active" defaultChecked={editing?.active ?? true} /> Active</label>

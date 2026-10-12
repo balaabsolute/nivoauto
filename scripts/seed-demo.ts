@@ -21,6 +21,7 @@ async function main() {
   console.log(`\nSign in with any demo account, password: ${DEMO_PASSWORD}`);
   console.log("  md@demo.kun.local · finance@demo.kun.local · admin@demo.kun.local");
   console.log("  manager.bmw@demo.kun.local · advisor.bmw@demo.kun.local · tech1.bmw@demo.kun.local (also .hon .hyu .rr .vw .byd)");
+  console.log("  sales1.hyu@demo.kun.local (sales consultant) · kiosk.hyu@demo.kun.local (showroom/lounge kiosk; also .hon .bmw .rr .vw .byd)");
   process.exit(0);
 }
 main().catch((e) => {

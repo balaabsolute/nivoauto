@@ -34,6 +34,11 @@ is the new baseline.
    fixed job numbering after gaps, made demo status inherit from the dealership, refused PGlite in
    production, added live-mode tests and an E2E regression loop, and verified on PostgreSQL 17.
 7. **Documentation:** README, KPI definitions, data model, deployment and known limitations.
+8. **Showroom & sales (CRM):** touch kiosks for showroom walk-ins (four visit types) and lounge feedback,
+   front-desk queue, enquiries with consultants, test drives, follow-ups and closing outcomes, consent-aware
+   model-update nurture with call tasks, future prospects from lounge feedback (5+ year upgrade tag),
+   showroom funnel on dashboards, car model catalogue, sales-consultant and kiosk roles, demo data, and
+   33 more unit/integration tests plus 3 end-to-end journeys.
 
 ## MVP acceptance criteria (brief §14)
 
@@ -63,7 +68,7 @@ is the new baseline.
 4. Move photo storage to object storage. Set up backups and monitoring. Add a CSP at the proxy.
 5. Measure the baseline for the success measures (brief §13) before setting any targets.
 
-**Phase 2 (Expand):** vehicle-sales pipeline module (leads, bookings, deliveries captured transactionally),
+**Phase 2 (Expand):** link enquiries won to bookings and delivery invoices; inbound STOP handling from the messaging provider;
 parts entries and consumption, more dealerships.
 **Phase 3 (Integrate):** accounting/DMS integrations through the import layer, automated reconciliation and
 pre-aggregated reporting tables.

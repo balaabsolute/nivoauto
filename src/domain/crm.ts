@@ -52,6 +52,17 @@ export const BUDGET_LABELS: Record<string, string> = {
   "50l_1cr": "₹50 L – ₹1 Cr",
   above_1cr: "Above ₹1 Cr",
 };
+/** Budget band → [min, max] rupees (null = open-ended). */
+export const BUDGET_RANGES: Record<string, [number | null, number | null]> = {
+  under_10l: [null, 1_000_000],
+  "10_15l": [1_000_000, 1_500_000],
+  "15_25l": [1_500_000, 2_500_000],
+  "25_50l": [2_500_000, 5_000_000],
+  "50l_1cr": [5_000_000, 10_000_000],
+  above_1cr: [10_000_000, null],
+};
+export const BODY_LABELS: Record<string, string> = { hatchback: "Hatchback", sedan: "Sedan", suv: "SUV", mpv: "MPV", luxury: "Luxury", ev: "Electric", coupe: "Coupé" };
+export const bodyLabel = (b: string | null) => (b ? BODY_LABELS[b] ?? b : null);
 export const UPGRADE_AGE_YEARS = Number(process.env.UPGRADE_AGE_YEARS ?? 5);
 
 /* ───────────── Tokens ───────────── */
@@ -116,6 +127,12 @@ export function hasMarketingPermission(c: ContactProfile): boolean {
 }
 
 export type NurtureSkip = "closed" | "no_marketing_consent" | "opted_out" | "no_channel";
+export const NURTURE_SKIP_LABELS: Record<NurtureSkip, string> = {
+  closed: "Enquiry closed",
+  no_marketing_consent: "No consent for offers/news",
+  opted_out: "Customer opted out",
+  no_channel: "No consented WhatsApp/SMS/email channel",
+};
 
 /** Why an enquiry would NOT receive a nurture message (null = eligible). */
 export function nurtureBlocker(leadStatus: LeadStatus, c: ContactProfile): NurtureSkip | null {

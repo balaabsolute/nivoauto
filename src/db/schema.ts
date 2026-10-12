@@ -710,6 +710,7 @@ export const modelUpdates = pgTable("model_updates", {
 });
 
 export const BUDGET_BANDS = ["under_10l", "10_15l", "15_25l", "25_50l", "50l_1cr", "above_1cr"] as const;
+export type BudgetBand = (typeof BUDGET_BANDS)[number];
 
 /** Lounge survey: upgrade intent of existing customers → future-prospect pool. */
 export const loungeFeedback = pgTable(

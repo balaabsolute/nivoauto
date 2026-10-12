@@ -58,6 +58,22 @@ The administrator then adds legal entities, brands, dealerships, capacity profil
 dealership scope) under **Administration**. The group finance user sets and approves monthly targets
 under **Finance & targets → Targets**.
 
+### Showroom and lounge kiosks
+
+1. An administrator adds the brand's models under **Administration → Car models**.
+2. Create a user with role **Kiosk device** and exactly one dealership (Administration → Users).
+3. On the showroom tablet or touch TV, open the site and sign in once as that user. Kiosk sessions last
+   30 days; the device lands on `/kiosk` (walk-ins). Kiosk accounts can only submit visits and feedback —
+   they can't read customer records.
+4. Put the browser in full-screen / kiosk mode: Android *Screen pinning* or *Add to Home screen* (the app
+   ships a web manifest), or Chrome with `--kiosk https://<host>/kiosk`.
+5. To switch a device to the lounge feedback screen, tap the top-right corner five times to open the staff
+   device menu, then choose *Lounge screen*. The same menu signs the device out.
+6. Screens reset automatically after inactivity so the next customer never sees earlier entries.
+
+Sales consultants (role **Sales consultant**) work enquiries and follow-ups; dealership managers also
+assign enquiries and publish model updates.
+
 ## 4. Demo vs live data
 
 | | Demo environment | Live / pilot environment |
@@ -130,7 +146,8 @@ provider adapter.
    performance targets. Set them after measuring the pilot baseline.
 5. **Photos are stored on local disk** (`UPLOAD_DIR`). For serverless or multi-instance hosting, replace
    `src/server/storage.ts` with object storage.
-6. **The sales pipeline comes from daily reports** (manual) until a sales system or Phase 2 module exists.
+6. **The daily-report sales pipeline is still manual.** The showroom CRM now captures walk-ins, enquiries,
+   test drives and outcomes transactionally; bookings and deliveries are not yet linked to invoices.
    Vehicle deliveries come from vehicle-sales invoice lines.
 7. **Inventory, stock-outs and ageing parts** aren't included until reliable inventory data exists.
 8. **No offline mode for workshop phones.** A network connection is needed to save updates.
@@ -143,3 +160,6 @@ provider adapter.
 12. **Cross-source duplicates are not detected automatically.** De-duplication is per source (`manual` vs
     `import`). If the same invoice is both entered manually and imported, it counts twice until marked
     *disputed* and corrected. Agree one source per dealership and category, and use reconciliation to catch exceptions.
+13. **Showroom CRM:** model updates are free text written by managers — only real, approved offers should
+    be sent. Replies such as *STOP* need the messaging provider's inbound webhook (not built yet); until then
+    staff record the opt-out on the enquiry. There's no kiosk offline mode.
